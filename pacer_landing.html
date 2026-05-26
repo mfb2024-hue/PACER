@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>PACER — Running intelligence built for India</title>
+<meta name="description" content="No running app was built for monsoon, 38°C heat, Navratri fasting, or roti before a long run. PACER was."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800;900&family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06060D;--s1:#0B0B16;--s2:#10101E;--s3:#161625;
+  --b1:rgba(255,255,255,.07);--b2:rgba(255,255,255,.12);
+  --green:#4ADE80;--cyan:#22D3EE;--orange:#FB923C;
+  --t1:#EEF2FF;--t2:#8899BB;--t3:#3D4A68;
+  --F:'Sora',sans-serif;--S:'Fraunces',serif;
+}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:var(--F);overflow-x:hidden;-webkit-font-smoothing:antialiased;line-height:1}
+a{text-decoration:none;color:inherit;-webkit-tap-highlight-color:transparent}
+button{-webkit-tap-highlight-color:transparent;cursor:pointer;font-family:var(--F)}
+
+nav{
+  position:sticky;top:0;z-index:100;
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  background:rgba(6,6,13,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--b1);
+}
+.logo{display:flex;align-items:center;gap:8px}
+.li{width:28px;height:28px;border-radius:7px;background:#0F172A;border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ln{font-size:14px;font-weight:800;letter-spacing:-.4px}
+.lb{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:rgba(34,211,238,.1);color:var(--cyan);padding:2px 6px;border-radius:4px}
+.ncta{font-size:12px;font-weight:600;color:var(--t2)}
+
+/* PROBLEM STATEMENT SECTION */
+.problem{
+  max-width:640px;margin:0 auto;
+  padding:72px 20px 56px;
+  text-align:center;
+  position:relative;
+}
+.problem::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:500px;height:400px;
+  background:radial-gradient(ellipse,rgba(34,211,238,.055) 0%,transparent 70%);
+  pointer-events:none;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid rgba(74,222,128,.2);background:rgba(74,222,128,.04);
+  border-radius:100px;padding:5px 13px;margin-bottom:24px;
+  font-size:11px;font-weight:600;color:var(--green);letter-spacing:.3px;
+}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.p-h1{
+  font-size:clamp(34px,9vw,64px);font-weight:900;
+  letter-spacing:-2.5px;line-height:.97;
+  margin-bottom:16px;
+}
+.p-h1 em{
+  font-family:var(--S);font-style:italic;font-weight:300;letter-spacing:0;
+  background:linear-gradient(130deg,var(--cyan),var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.problem-statement{
+  font-size:clamp(15px,2.5vw,18px);color:var(--t2);
+  line-height:1.75;font-weight:300;
+  margin-bottom:0;
+  max-width:520px;margin:0 auto;
+}
+.problem-statement strong{color:var(--t1);font-weight:600}
+
+/* THE GAP — what others miss */
+.gap{
+  max-width:640px;margin:0 auto;
+  padding:0 20px 56px;
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+@media(max-width:500px){.gap{grid-template-columns:1fr}}
+.gap-item{
+  background:var(--s1);border:1px solid var(--b1);
+  border-radius:14px;padding:16px 18px;
+  position:relative;overflow:hidden;
+}
+.gap-item::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;opacity:.6}
+.gap-item.c::before{background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.gap-item.g::before{background:linear-gradient(90deg,transparent,var(--green),transparent)}
+.gap-item.o::before{background:linear-gradient(90deg,transparent,var(--orange),transparent)}
+.gap-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:7px}
+.gap-title{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:5px;letter-spacing:-.2px;line-height:1.3}
+.gap-sub{font-size:12px;color:var(--t2);line-height:1.6;font-weight:300}
+
+/* WHAT PACER DOES */
+.what{background:var(--s1);border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);padding:56px 0}
+.what-inner{max-width:640px;margin:0 auto;padding:0 20px}
+.section-label{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:14px}
+.section-h{font-size:clamp(24px,5vw,36px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:12px}
+.section-h em{font-family:var(--S);font-style:italic;font-weight:300;letter-spacing:0}
+.section-p{font-size:15px;color:var(--t2);line-height:1.8;font-weight:300}
+.features{display:flex;flex-direction:column;gap:0;margin-top:28px;border:1px solid var(--b1);border-radius:16px;overflow:hidden}
+.feat{display:flex;align-items:flex-start;gap:14px;padding:18px 20px;border-bottom:1px solid var(--b1);background:var(--s2)}
+.feat:last-child{border-bottom:none}
+.feat:hover{background:var(--s3)}
+.feat-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.feat-ico.g{background:rgba(74,222,128,.08)}
+.feat-ico.c{background:rgba(34,211,238,.08)}
+.feat-ico.o{background:rgba(251,146,60,.08)}
+.feat h4{font-size:14px;font-weight:700;margin-bottom:4px;letter-spacing:-.2px}
+.feat p{font-size:12px;color:var(--t2);line-height:1.65;font-weight:300}
+
+/* PULL QUOTE */
+.pq{max-width:640px;margin:0 auto;padding:56px 20px;text-align:center}
+.pq-text{
+  font-family:var(--S);font-style:italic;font-weight:300;
+  font-size:clamp(19px,4vw,28px);line-height:1.55;
+  color:var(--t1);margin-bottom:14px;
+}
+.pq-text strong{font-style:normal;font-weight:600;color:var(--green)}
+.pq-sub{font-size:14px;color:var(--t3);font-weight:300}
+
+/* CLUBS ROW */
+.clubs-row{
+  background:var(--s1);border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);
+  padding:40px 20px;
+}
+.clubs-inner{max-width:640px;margin:0 auto;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.clubs-left{flex:1;min-width:240px}
+.clubs-left h3{font-size:18px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px}
+.clubs-left p{font-size:13px;color:var(--t2);line-height:1.7;font-weight:300}
+.clubs-right{flex-shrink:0}
+.clubs-tag{
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid rgba(167,139,250,.2);background:rgba(167,139,250,.05);
+  border-radius:10px;padding:10px 16px;
+  font-size:13px;font-weight:600;color:#C4B5FD;
+}
+
+/* WAITLIST */
+.wl-outer{background:var(--s1);border-top:1px solid var(--b1);padding:64px 20px}
+.wl{max-width:540px;margin:0 auto;text-align:center}
+.wl-h{font-size:clamp(26px,5vw,38px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:8px}
+.wl-h em{font-family:var(--S);font-style:italic;font-weight:300;letter-spacing:0}
+.wl-sub{font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:28px;font-weight:300}
+.wl-form input,.wl-form select{
+  display:block;width:100%;
+  background:var(--s2);border:1px solid var(--b2);border-radius:11px;
+  padding:14px 16px;font-size:16px;color:var(--t1);outline:none;font-family:var(--F);font-weight:300;
+  -webkit-appearance:none;margin-bottom:10px;
+  transition:border-color .15s;
+}
+.wl-form input:focus,.wl-form select:focus{border-color:rgba(74,222,128,.4)}
+.wl-form input::placeholder{color:var(--t3)}
+.wl-form select option{background:#10101E}
+.wl-2{display:flex;flex-direction:column;gap:0}
+@media(min-width:480px){.wl-2{flex-direction:row;gap:10px}.wl-2 input{margin-bottom:0}}
+.wl-btn{
+  display:block;width:100%;
+  background:var(--green);color:#06060D;
+  border:none;border-radius:11px;padding:15px;
+  font-size:16px;font-weight:800;letter-spacing:-.3px;
+  margin-top:10px;min-height:52px;
+  transition:opacity .15s,transform .1s;
+}
+.wl-btn:active{opacity:.9;transform:scale(.99)}
+.wl-success{display:none;background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.18);border-radius:16px;padding:32px 24px}
+.wl-success h3{font-size:20px;font-weight:700;color:var(--green);margin-bottom:8px;letter-spacing:-.3px}
+.wl-success p{font-size:14px;color:var(--t2);line-height:1.75;font-weight:300;margin-bottom:20px}
+.wl-count{font-size:12px;color:var(--t3);margin-top:14px;font-weight:300}
+.wl-open{display:inline-flex;align-items:center;gap:8px;background:var(--s3);border:1px solid var(--b2);color:var(--t2);border-radius:10px;padding:12px 20px;font-size:14px;font-weight:600}
+
+footer{border-top:1px solid var(--b1);padding:24px 20px;max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.ft{color:var(--t3);font-size:12px;font-weight:300}
+
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.problem>*{animation:up .5s ease both}
+.problem>*:nth-child(1){animation-delay:.07s}
+.problem>*:nth-child(2){animation-delay:.14s}
+.problem>*:nth-child(3){animation-delay:.21s}
+.problem>*:nth-child(4){animation-delay:.28s}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="li"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="6" r="2"/><path d="M9 22l3-8 3 8"/><path d="M9 14H5m14 0h-4"/></svg></div>
+    <span class="ln">PACER</span>
+    <span class="lb">Beta</span>
+  </div>
+  <a href="pacer.html" class="ncta">Open app →</a>
+</nav>
+
+<!-- PROBLEM -->
+<div class="problem">
+  <div class="eyebrow"><span class="pulse"></span>Built in India · For India</div>
+  <h1 class="p-h1">No running app<br/>was built for <em>this.</em></h1>
+  <p class="problem-statement">
+    <strong>38°C heat.</strong> <strong>85% humidity.</strong> <strong>AQI 190.</strong> <strong>Roti before a long run.</strong> <strong>Four months of monsoon.</strong> <strong>Navratri fasting.</strong><br/><br/>
+    Every running app in the world was built for 15°C weather and granola bars. PACER was built for running in India.
+  </p>
+</div>
+
+<!-- THE GAP -->
+<div class="gap">
+  <div class="gap-item c">
+    <p class="gap-label" style="color:var(--cyan)">What others miss</p>
+    <h3 class="gap-title">Your pace in July isn't fitness</h3>
+    <p class="gap-sub">At 85% humidity you're working 26 extra seconds per kilometer. Every app calls you slow. PACER explains why.</p>
+  </div>
+  <div class="gap-item g">
+    <p class="gap-label" style="color:var(--green)">What others miss</p>
+    <h3 class="gap-title">Monsoon arrives every year</h3>
+    <p class="gap-sub">Four months. Every training plan ignores them. PACER builds around them from week one.</p>
+  </div>
+  <div class="gap-item o">
+    <p class="gap-label" style="color:var(--orange)">What others miss</p>
+    <h3 class="gap-title">Your kitchen isn't a supplement store</h3>
+    <p class="gap-sub">Roti, dal, curd rice, sattu, coconut water — PACER knows what these do for your run. No apps do.</p>
+  </div>
+  <div class="gap-item c">
+    <p class="gap-label" style="color:var(--cyan)">What others miss</p>
+    <h3 class="gap-title">AQI isn't just a number</h3>
+    <p class="gap-sub">180 AQI in Delhi means don't run. 75 in Bengaluru means GO. PACER gives you the verdict, not the data.</p>
+  </div>
+</div>
+
+<!-- WHAT PACER DOES -->
+<div class="what">
+  <div class="what-inner">
+    <span class="section-label">What PACER does</span>
+    <h2 class="section-h">A coach that knows<br/><em>where you live.</em></h2>
+    <p class="section-p">Open PACER before your run. Tell it how you're feeling. It reads the air in your city, knows where you are in your training, and tells you in three sentences what to do today and why.</p>
+    <div class="features">
+      <div class="feat">
+        <div class="feat-ico g"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg></div>
+        <div>
+          <h4>The morning brief</h4>
+          <p>AQI. Heat index. Humidity. One answer: go, wait, or rest. Then the exact seconds per km harder you're working today — so you stop blaming your legs.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="feat-ico c"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div>
+          <h4>Talk to your coach</h4>
+          <p>"Had 2 rotis, legs feel heavy." PACER doesn't acknowledge it. It tells you what to do next — adjust the session, change the pace, eat something first. The answer, not the echo.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="feat-ico g"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+        <div>
+          <h4>Training plans that survive India</h4>
+          <p>16-week plans with monsoon built in. Paces adjusted for your city's heat. Sessions that know you eat rice, not gels. No plan should pretend July doesn't exist.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="feat-ico o"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+        <div>
+          <h4>Challenge someone. Run more.</h4>
+          <p>Weekly KM race against anyone in India. The most effective accountability tool is still a friend who knows your score.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PULL QUOTE -->
+<div class="pq">
+  <p class="pq-text">Three weeks of 6:45/km. Training says 6:20. You think you're losing fitness. You're not. It's <strong>89% humidity</strong> — 26 extra seconds per kilometer, invisible, every single day.</p>
+  <p class="pq-sub">PACER tells you this before your run, not after three weeks of self-doubt.</p>
+</div>
+
+<!-- CLUBS -->
+<div class="clubs-row">
+  <div class="clubs-inner">
+    <div class="clubs-left">
+      <h3>Running a club? PACER handles the ops.</h3>
+      <p>Attendance, payments, WhatsApp broadcasts — all from one place. Built for Indian run clubs that are done managing things on Excel and group chats.</p>
+    </div>
+    <div class="clubs-right">
+      <a href="#waitlist" class="clubs-tag">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        For run clubs →
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- WAITLIST -->
+<div class="wl-outer" id="waitlist">
+  <div class="wl">
+    <h2 class="wl-h">Get on the <em>list.</em></h2>
+    <p class="wl-sub">PACER is in beta. We're opening city by city. Leave your details — we'll reach out when we're in your area, or when you can just try it now.</p>
+
+    <div id="wl-form" class="wl-form">
+      <div class="wl-2" style="margin-bottom:10px">
+        <input id="wl-n" type="text" placeholder="Your name" autocomplete="name"/>
+        <input id="wl-e" type="email" placeholder="Email address" autocomplete="email"/>
+      </div>
+      <div class="wl-2">
+        <input id="wl-c" type="text" placeholder="Your city" autocomplete="off"/>
+        <select id="wl-r">
+          <option value="" disabled selected>I am a…</option>
+          <option value="runner">Runner</option>
+          <option value="beginner">Just starting out</option>
+          <option value="member">Run club member</option>
+          <option value="founder">Run club founder</option>
+        </select>
+      </div>
+      <button class="wl-btn" onclick="joinList()">Join the waitlist →</button>
+      <p id="wl-count" class="wl-count"></p>
+    </div>
+
+    <div id="wl-success" class="wl-success">
+      <h3>You're on the list.</h3>
+      <p id="wl-msg">We'll reach out when PACER is ready for your city. The beta is live right now — try the morning briefing tomorrow before your run.</p>
+      <a href="pacer.html" class="wl-open">Open PACER now →</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="logo">
+    <div class="li"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="6" r="2"/><path d="M9 22l3-8 3 8"/><path d="M9 14H5m14 0h-4"/></svg></div>
+    <span class="ln">PACER</span>
+    <span class="ft" style="margin-left:4px">Running built for India</span>
+  </div>
+  <a href="pacer.html" class="ft">Open app →</a>
+</footer>
+
+<script>
+(function(){
+  var list=JSON.parse(localStorage.getItem('p_wl')||'[]');
+  if(list.length>0){
+    var el=document.getElementById('wl-count');
+    if(el)el.textContent=list.length+' runner'+(list.length>1?'s':'')+' already on the list';
+  }
+})();
+function joinList(){
+  var n=document.getElementById('wl-n').value.trim();
+  var e=document.getElementById('wl-e').value.trim();
+  var c=document.getElementById('wl-c').value.trim();
+  var r=document.getElementById('wl-r').value;
+  if(!n){alert('Please enter your name.');return;}
+  if(!e||!e.includes('@')){alert('Please enter a valid email.');return;}
+  var list=JSON.parse(localStorage.getItem('p_wl')||'[]');
+  if(list.find(function(x){return x.e===e;})){alert("You're already on the list.");return;}
+  list.push({n:n,e:e,c:c,r:r,t:new Date().toISOString()});
+  localStorage.setItem('p_wl',JSON.stringify(list));
+  document.getElementById('wl-form').style.display='none';
+  document.getElementById('wl-success').style.display='block';
+  var msgs={
+    founder:"Founders are who we built the ops layer for. We'll reach out to you first.",
+    beginner:"Starting from zero is the best place to start. PACER will walk you through it.",
+    member:"We'll reach out when PACER is live for your club. Try the beta now — and show your founder this page.",
+    runner:"We'll reach out when PACER is ready for "+(c||'your city')+". The beta is live — try the morning briefing tomorrow."
+  };
+  document.getElementById('wl-msg').textContent=msgs[r]||msgs.runner;
+}
+</script>
+</body>
+</html>
