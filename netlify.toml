@@ -6,6 +6,16 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/"
+  to = "/pacer.html"
+  status = 200
+
+[[redirects]]
+  from = "/app"
+  to = "/pacer.html"
+  status = 200
+
+[[redirects]]
   from = "/api/weather"
   to = "/.netlify/functions/weather"
   status = 200
