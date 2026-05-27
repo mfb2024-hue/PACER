@@ -30,7 +30,6 @@ input,button,select,textarea{font-family:inherit}
 <body>
 <div id="root"></div>
 <script>
-/* Fallback fetch interceptor for standalone use (bypassed when Netlify functions respond) */
 (function(){
   var o=window.fetch;
   window.fetch=function(u,p){
@@ -209,6 +208,17 @@ function saveLog(date, data) {
 function loadBrief() {
   return load(K.BRIEF, {});
 }
+// Coach memory — cross-session context (separate from daily log)
+var CMEM = 'p_cmem';
+function loadCoachMem() {
+  return load(CMEM, {});
+}
+function saveCoachMem(patch) {
+  var m = Object.assign({}, loadCoachMem(), patch, {
+    updatedAt: Date.now()
+  });
+  store(CMEM, m);
+}
 function saveBrief(date, text) {
   var b = loadBrief();
   b[date] = text;
@@ -276,55 +286,45 @@ var COORDS = {
   Kolkata: {
     lat: 22.5726,
     lon: 88.3639
+  },
+  Ahmedabad: {
+    lat: 23.0225,
+    lon: 72.5714
+  },
+  Jaipur: {
+    lat: 26.9124,
+    lon: 75.7873
   }
 };
-var STATIC_WEATHER = {
-  Bhubaneswar: {
-    aqi: 72,
-    temp: 29,
-    humidity: 78
-  },
-  Bengaluru: {
-    aqi: 65,
-    temp: 24,
-    humidity: 62
-  },
-  Mumbai: {
-    aqi: 88,
-    temp: 28,
-    humidity: 83
-  },
-  Delhi: {
-    aqi: 145,
-    temp: 27,
-    humidity: 52
-  },
-  Chennai: {
-    aqi: 78,
-    temp: 30,
-    humidity: 80
-  },
-  Hyderabad: {
-    aqi: 82,
-    temp: 27,
-    humidity: 64
-  },
-  Pune: {
-    aqi: 55,
-    temp: 25,
-    humidity: 58
-  },
-  Kolkata: {
-    aqi: 95,
-    temp: 28,
-    humidity: 76
-  }
+// Seasonal data: 12 months of [aqi, baseTemp, humidity] per city
+// Time-adjusted: morning is cooler, afternoon is hotter
+var SEASONAL = {
+  Bhubaneswar: [[58, 22, 68], [52, 25, 62], [60, 32, 52], [72, 36, 40], [80, 40, 35], [65, 33, 72], [58, 30, 85], [55, 29, 86], [62, 30, 80], [68, 28, 70], [65, 25, 66], [60, 22, 66]],
+  Bengaluru: [[55, 24, 55], [58, 26, 52], [60, 28, 48], [62, 30, 52], [60, 29, 56], [48, 25, 70], [42, 23, 78], [44, 23, 78], [48, 24, 76], [52, 23, 72], [55, 22, 68], [56, 22, 62]],
+  Mumbai: [[85, 28, 65], [80, 29, 62], [75, 32, 65], [68, 34, 72], [62, 34, 78], [52, 30, 88], [42, 28, 92], [42, 28, 91], [52, 29, 88], [74, 31, 80], [85, 30, 73], [90, 28, 67]],
+  Delhi: [[210, 16, 75], [180, 19, 68], [145, 25, 45], [125, 35, 28], [115, 40, 22], [90, 40, 36], [72, 33, 70], [68, 32, 74], [88, 33, 65], [140, 28, 50], [205, 22, 64], [230, 16, 74]],
+  Chennai: [[66, 28, 72], [62, 30, 68], [64, 33, 62], [68, 36, 60], [70, 38, 58], [58, 34, 72], [52, 32, 80], [50, 32, 82], [58, 32, 80], [72, 30, 76], [78, 28, 74], [72, 28, 72]],
+  Hyderabad: [[58, 24, 58], [54, 27, 52], [60, 32, 42], [70, 36, 28], [75, 40, 22], [65, 34, 45], [55, 28, 72], [52, 27, 74], [58, 28, 68], [65, 26, 58], [62, 24, 60], [62, 23, 60]],
+  Pune: [[52, 22, 52], [48, 25, 48], [54, 30, 42], [62, 34, 34], [65, 36, 30], [52, 28, 60], [44, 25, 72], [42, 25, 74], [48, 26, 70], [52, 24, 62], [55, 22, 58], [54, 22, 54]],
+  Kolkata: [[95, 20, 72], [85, 23, 68], [80, 30, 60], [90, 34, 56], [95, 36, 60], [72, 32, 82], [60, 30, 88], [58, 30, 88], [68, 31, 84], [78, 30, 76], [90, 26, 70], [95, 22, 72]],
+  Ahmedabad: [[68, 22, 55], [62, 25, 48], [70, 32, 36], [82, 38, 22], [88, 42, 18], [72, 38, 40], [62, 32, 65], [60, 30, 68], [68, 32, 60], [72, 28, 50], [72, 24, 52], [70, 22, 54]],
+  Jaipur: [[80, 16, 68], [72, 20, 58], [78, 28, 40], [90, 36, 22], [95, 40, 18], [82, 36, 38], [68, 30, 62], [65, 28, 66], [72, 30, 58], [80, 28, 48], [82, 22, 55], [84, 17, 62]]
 };
 function getStaticWeather(city) {
-  return STATIC_WEATHER[city] || {
-    aqi: 75,
-    temp: 28,
-    humidity: 70
+  var month = new Date().getMonth();
+  var hour = new Date().getHours();
+  var d = SEASONAL[city] || SEASONAL.Bengaluru;
+  var row = d[month];
+  var aqi = row[0],
+    base = row[1],
+    hum = row[2];
+  // Time-of-day temperature offset (same logic as coach-brain.js)
+  var tOff = hour < 6 ? -7 : hour < 9 ? -3 : hour < 13 ? 3 : hour < 17 ? 6 : hour < 20 ? 2 : -4;
+  var temp = Math.round(base + tOff);
+  return {
+    aqi: aqi,
+    temp: temp,
+    humidity: hum
   };
 }
 function pm25toAQI(pm) {
@@ -675,7 +675,8 @@ function getFuel(hour, sessType) {
 function getApiKey() {
   return gk('pacer_claude_key');
 }
-async function callClaude(system, user, maxTok) {
+async function callClaude(system, user, maxTok, model) {
+  var mdl = model || MODEL_DEEP;
   // Try Netlify function first (no key needed, server-side)
   try {
     var fr = await fetch('/.netlify/functions/coach-brain', {
@@ -686,7 +687,8 @@ async function callClaude(system, user, maxTok) {
       body: JSON.stringify({
         system: system,
         user: user,
-        max_tokens: maxTok || 180
+        max_tokens: maxTok || 180,
+        model: mdl
       })
     });
     if (fr.ok) {
@@ -703,7 +705,7 @@ async function callClaude(system, user, maxTok) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: mdl,
       max_tokens: maxTok || 180,
       system: system,
       messages: [{
@@ -744,22 +746,24 @@ async function buildBriefing(params) {
     return !d.ran && d.type !== 'rest';
   }).length;
   var planName = PLANS[planType] && PLANS[planType].name || 'General';
-  var prompt = 'City:' + city + ' | AQI:' + (wd.live ? 'LIVE ' : '') + wd.aqi + ' PM2.5:' + (wd.pm25 || '?') + ' Heat:' + heatIdx + 'C +' + therm + 's/km | ' + verd.v + '\nPlan:' + planName + ' | Today:' + sess[1] + ' ' + (sess[2] || 0) + 'km\nWeek:' + weeklyKm + '/' + goalKm + 'km | Streak:' + streak + ' | Runner:' + runnerType + '\nToday sleep:' + (ctx.todaySleep || 'not logged') + (poorSleep >= 2 ? ' | ' + poorSleep + ' poor sleep nights this week' : '') + '\nRecent days:\n' + ctxLines + (swap ? '\nConditions flag: ' + verd.v + ' — consider swapping ' + sess[0] + ' session' : '') + '\n\nWrite a proactive morning briefing. 3 short lines only. No labels, no bullets. Reference sleep/training patterns when relevant. Line 1: conditions + what it means for running. Line 2: training guidance for today. Line 3: one specific nutrition suggestion.';
+  var cmem = loadCoachMem();
+  var memNote = cmem.lastCoachingNote ? 'Last note: ' + cmem.lastCoachingNote.substring(0, 100) : '';
+  var prompt = 'City:' + city + ' | AQI:' + (wd.live ? 'LIVE ' : '') + wd.aqi + ' PM2.5:' + (wd.pm25 || '?') + ' Heat:' + heatIdx + 'C +' + therm + 's/km | ' + verd.v + '\nPlan:' + planName + ' | Today:' + sess[1] + ' ' + (sess[2] || 0) + 'km\nWeek:' + weeklyKm + '/' + goalKm + 'km | Streak:' + streak + ' | Runner:' + runnerType + '\nToday sleep:' + (ctx.todaySleep || 'not logged') + (poorSleep >= 2 ? ' | ' + poorSleep + ' poor sleep nights this week' : '') + '\nRecent days:\n' + ctxLines + (swap ? '\nConditions flag: ' + verd.v + ' — consider swapping ' + sess[0] + ' session' : '') + (memNote ? '\n' + memNote : '') + '\n\nWrite a proactive morning briefing. 3 short lines only. No labels, no bullets. Reference sleep/training patterns when relevant. Line 1: conditions + what it means for running. Line 2: training guidance for today. Line 3: one specific nutrition suggestion.';
   return callClaude('You are PACER, a sharp Indian running coach with memory. 3 lines only. Direct. Reference patterns when you see them — poor sleep streaks, missed sessions, good form. India-specific food (roti, dal, curd rice, sattu, ORS, coconut water, dates). Never start with I.', prompt, 200);
 }
 async function askCoach(userMsg, ctxStr) {
-  return callClaude('You are PACER, Indian running coach. 2-3 sentences. End with one clear action. Reference context when relevant. Know Indian food and conditions.', 'Context: ' + ctxStr + '\nRunner: "' + userMsg + '"', 160);
+  return callClaude('You are PACER, Indian running coach. 2-3 sentences. End with one clear action. Reference context when relevant. Know Indian food and conditions.', 'Context: ' + ctxStr + '\nRunner: "' + userMsg + '"', 160, MODEL_FAST);
 }
 async function getSwapExplanation(city, sessType, daysAhead, weather) {
   var wd = weather || getStaticWeather(city);
   var heatIdx = hiCalc(wd.temp, wd.humidity);
   var verd = getVerdict(wd.aqi, heatIdx);
-  return callClaude('You are PACER. 2 sentences. Why this swap makes sense today. Specific about conditions. End by confirming weekly load stays same.', 'City:' + city + ' AQI:' + wd.aqi + ' (' + verd.label + '). Swapping ' + sessType + ' to easy run today, moving ' + sessType + ' ' + daysAhead + ' days ahead.', 120);
+  return callClaude('You are PACER. 2 sentences. Why this swap makes sense today. Specific about conditions. End by confirming weekly load stays same.', 'City:' + city + ' AQI:' + wd.aqi + ' (' + verd.label + '). Swapping ' + sessType + ' to easy run today, moving ' + sessType + ' ' + daysAhead + ' days ahead.', 120, MODEL_FAST);
 }
 async function getPostRunAdvice(distKm, feel, sessType, city, weather) {
   var wd = weather || getStaticWeather(city);
   var heatIdx = hiCalc(wd.temp, wd.humidity);
-  return callClaude('You are PACER. Post-run recovery coach. 2 sentences. Specific Indian foods (curd rice, sattu, coconut water, ORS, banana+milk). One action now, one for tomorrow.', 'Finished ' + distKm + 'km ' + sessType + '. Felt: ' + feel + '. City:' + city + ' heat index ' + heatIdx + 'C.', 130);
+  return callClaude('You are PACER. Post-run recovery coach. 2 sentences. Specific Indian foods (curd rice, sattu, coconut water, ORS, banana+milk). One action now, one for tomorrow.', 'Finished ' + distKm + 'km ' + sessType + '. Felt: ' + feel + '. City:' + city + ' heat index ' + heatIdx + 'C.', 130, MODEL_FAST);
 }
 
 // ─── ICONS ───────────────────────────────────────────────────────────────────
@@ -2388,11 +2392,29 @@ function PostRunCheckin(props) {
       km: entry && entry.distKm || 0,
       type: entry && entry.type || 'run'
     });
+    var fallbacks = {
+      great: 'Strong run. Eat within 30 min — curd rice + banana or sattu shake. Drink 500ml now. Tomorrow: maintain intensity.',
+      good: 'Solid effort. Curd rice or dal chawal within 30 min. 500ml water now. Keep the pattern going.',
+      okay: 'Okay days are part of training. Check sleep and food. Curd rice + a banana now. Tomorrow: easy pace regardless of plan.',
+      tough: 'Tough day. Eat within 30 min anyway — curd rice or banana+milk. Tomorrow: easy run, no exceptions. Sleep early tonight.'
+    };
     try {
       var t = await getPostRunAdvice(entry && entry.distKm || 0, val, entry && entry.type || 'run', city, weather);
-      setAdvice(t);
+      var finalText = t || fallbacks[val] || fallbacks.good;
+      setAdvice(finalText);
+      saveCoachMem({
+        lastCoachingNote: finalText,
+        lastRunFeel: val,
+        lastRunDate: todayStr()
+      });
     } catch (e) {
-      setAdvice('Great effort. Eat within 30 min — curd rice, banana+milk, or sattu shake. Drink 500ml water now. Tomorrow: keep it easy or take a full rest day.');
+      var fb = fallbacks[val] || fallbacks.good;
+      setAdvice(fb);
+      saveCoachMem({
+        lastCoachingNote: fb,
+        lastRunFeel: val,
+        lastRunDate: todayStr()
+      });
     }
     setAdviceLoading(false);
   }
@@ -2461,27 +2483,39 @@ function PostRunCheckin(props) {
   }, "Your coach uses this for tomorrow's briefing and to track patterns over time."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
+      flexDirection: 'column',
       gap: 8
     }
-  }, [['great', 'Great'], ['good', 'Good'], ['okay', 'Okay'], ['tough', 'Tough']].map(function (pair) {
+  }, [['great', '💪', 'Strong run'], ['good', '👍', 'Good effort'], ['okay', '😐', 'Just okay'], ['tough', '😓', 'Tough day']].map(function (arr) {
     return /*#__PURE__*/React.createElement("button", {
-      key: pair[0],
+      key: arr[0],
       onClick: function () {
-        pickFeel(pair[0]);
+        pickFeel(arr[0]);
       },
       style: {
-        flex: 1,
-        padding: '12px 6px',
-        borderRadius: 10,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '13px 16px',
+        borderRadius: 12,
         border: '1.5px solid ' + C.b1,
         background: C.card,
-        color: C.t1,
-        fontSize: 12,
-        fontWeight: 600,
         cursor: 'pointer',
-        transition: 'all .15s'
+        textAlign: 'left',
+        width: '100%'
       }
-    }, pair[1]);
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 22,
+        lineHeight: 1
+      }
+    }, arr[1]), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: C.t1
+      }
+    }, arr[2]));
   }))), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
@@ -4222,7 +4256,7 @@ function ProfileScreen(props) {
   var [openApps, setOpenApps] = useState(false);
   var runData = loadRuns();
   var runs = runData.runs || [];
-  var CITIES = ['Bhubaneswar', 'Bengaluru', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata'];
+  var CITIES = ['Bhubaneswar', 'Bengaluru', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Ahmedabad', 'Jaipur'];
   var PLAN_LIST = [['general', 'General Fitness'], ['5k', '5K Plan'], ['half', 'Half Marathon'], ['marathon', 'Marathon'], ['beginner', 'Start Running']];
   var longest = runs.length ? Math.max.apply(null, runs.map(function (r) {
     return parseFloat(r.distKm) || 0;
@@ -4754,7 +4788,7 @@ function AuthScreen(props) {
   var [rType, setRType] = useState('');
   var [goal, setGoal] = useState('');
   var [weekKm, setWeekKm] = useState(30);
-  var CITIES = ['Bhubaneswar', 'Bengaluru', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata'];
+  var CITIES = ['Bhubaneswar', 'Bengaluru', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Ahmedabad', 'Jaipur'];
   var inp = {
     background: C.card2,
     border: '1px solid ' + C.b1,
@@ -5320,6 +5354,312 @@ function AuthScreen(props) {
   }, "Start running")));
 }
 
+// ─── MORNING MODAL (first open each day) ─────────────────────────────────────
+function MorningModal(props) {
+  var open = props.open,
+    onClose = props.onClose,
+    userPrefs = props.userPrefs,
+    weather = props.weather;
+  var city = userPrefs && userPrefs.city || 'Bhubaneswar';
+  var planType = userPrefs && userPrefs.plan || 'general';
+  var wd = weather || getStaticWeather(city);
+  var heatIdx = hiCalc(wd.temp, wd.humidity);
+  var therm = thermalCalc(heatIdx, wd.humidity);
+  var verd = getVerdict(wd.aqi, heatIdx);
+  var sess = getSession(planType);
+  var SCOL = {
+    easy: C.green,
+    tempo: '#22D3EE',
+    intervals: C.orange,
+    long: '#A78BFA',
+    rest: '#64748B',
+    recovery: C.green
+  };
+  var col = SCOL[sess[0]] || C.green;
+  var name = (userPrefs && userPrefs.name || 'Runner').split(' ')[0];
+  var weeklyKm = loadRuns().weeklyKm || 0;
+  var goalKm = userPrefs && userPrefs.weekGoal || 40;
+  var streak = loadRuns().streak || 0;
+  function close() {
+    localStorage.setItem('pacer_morning_date', todayStr());
+    onClose();
+  }
+  if (!open) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: close,
+    style: {
+      position: 'fixed',
+      inset: 0,
+      zIndex: 600,
+      background: 'rgba(0,0,0,.7)',
+      backdropFilter: 'blur(6px)',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: function (e) {
+      e.stopPropagation();
+    },
+    style: {
+      width: '100%',
+      maxWidth: 430,
+      background: C.navy,
+      borderRadius: '24px 24px 0 0',
+      padding: '10px 22px 44px',
+      borderTop: '1px solid rgba(255,255,255,.08)',
+      animation: 'su .38s cubic-bezier(.32,.72,0,1)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 32,
+      height: 4,
+      background: 'rgba(255,255,255,.18)',
+      borderRadius: 2,
+      margin: '0 auto 22px'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 42,
+      height: 42,
+      background: 'rgba(79,159,255,.12)',
+      borderRadius: 12,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: 20,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(IcoRun, null)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 9,
+      color: 'rgba(255,255,255,.3)',
+      letterSpacing: '1.5px',
+      textTransform: 'uppercase',
+      marginBottom: 3
+    }
+  }, "Your coach \xB7 ", new Date().toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 16,
+      fontWeight: 700,
+      color: '#fff'
+    }
+  }, greeting(), ", ", name))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: col + '12',
+      border: '1px solid ' + col + '35',
+      borderRadius: 14,
+      padding: '14px 16px',
+      marginBottom: 14,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 9,
+      color: 'rgba(255,255,255,.3)',
+      textTransform: 'uppercase',
+      letterSpacing: '1.5px',
+      marginBottom: 5
+    }
+  }, "Today's session"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800,
+      color: col,
+      letterSpacing: '-.4px'
+    }
+  }, sess[0] === 'rest' ? 'Rest Day' : sess[1])), sess[2] > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      background: col + '18',
+      borderRadius: 10,
+      padding: '8px 14px'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 24,
+      fontWeight: 900,
+      color: col,
+      lineHeight: 1
+    }
+  }, sess[2]), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 8,
+      color: 'rgba(255,255,255,.3)',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      marginTop: 2
+    }
+  }, "km"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      background: 'rgba(255,255,255,.05)',
+      borderRadius: 10,
+      padding: '10px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      color: wd.aqi < 100 ? C.green : wd.aqi < 150 ? C.orange : C.red,
+      fontFamily: C.F
+    }
+  }, wd.aqi), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 8,
+      color: 'rgba(255,255,255,.25)',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      marginTop: 2
+    }
+  }, "AQI", wd.live ? ' live' : '')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      background: 'rgba(255,255,255,.05)',
+      borderRadius: 10,
+      padding: '10px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      color: '#fff',
+      fontFamily: C.F
+    }
+  }, heatIdx, "\xB0"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 8,
+      color: 'rgba(255,255,255,.25)',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      marginTop: 2
+    }
+  }, "Heat Index")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 2,
+      background: verd.c + '12',
+      border: '1px solid ' + verd.c + '35',
+      borderRadius: 10,
+      padding: '10px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 16,
+      fontWeight: 900,
+      color: verd.c,
+      fontFamily: C.F
+    }
+  }, verd.v), therm > 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 9,
+      color: 'rgba(255,255,255,.3)',
+      marginTop: 2
+    }
+  }, "+", therm, "s/km harder"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      background: 'rgba(255,255,255,.05)',
+      borderRadius: 10,
+      padding: '10px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800,
+      color: C.orange,
+      fontFamily: C.F
+    }
+  }, streak), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 8,
+      color: 'rgba(255,255,255,.25)',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      marginTop: 2
+    }
+  }, "Run streak")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      background: 'rgba(255,255,255,.05)',
+      borderRadius: 10,
+      padding: '10px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800,
+      color: '#fff',
+      fontFamily: C.F
+    }
+  }, weeklyKm), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 8,
+      color: 'rgba(255,255,255,.25)',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      marginTop: 2
+    }
+  }, "km this week")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 2,
+      background: 'rgba(255,255,255,.05)',
+      borderRadius: 10,
+      padding: '10px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: weeklyKm >= goalKm ? C.green : 'rgba(255,255,255,.6)',
+      fontFamily: C.F
+    }
+  }, weeklyKm >= goalKm ? 'Goal reached!' : Math.max(0, goalKm - weeklyKm) + 'km to goal'))), /*#__PURE__*/React.createElement("button", {
+    onClick: close,
+    style: {
+      width: '100%',
+      background: '#4F9FFF',
+      color: '#000',
+      border: 'none',
+      borderRadius: 13,
+      padding: '16px',
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: 'pointer',
+      letterSpacing: '-.2px'
+    }
+  }, "Let's go")));
+}
+
 // ─── NAV BAR ──────────────────────────────────────────────────────────────────
 function NavBar(props) {
   var nav = props.nav,
@@ -5400,6 +5740,8 @@ function App() {
     syncing: false,
     lastSync: 0
   });
+  var [showMorning, setShowMorning] = useState(false);
+  var [morningReady, setMorningReady] = useState(false);
   var scrollRef = useRef(null);
 
   // Load session + handle Strava OAuth callback + auto-sync
@@ -5410,6 +5752,11 @@ function App() {
       if (s && s.prefs && s.prefs.name) {
         setUserPrefs(s.prefs);
         setScreen('app');
+        // Show morning modal on first open of the day
+        var lastModal = localStorage.getItem('pacer_morning_date');
+        if (lastModal !== todayStr()) {
+          setShowMorning(true);
+        }
       }
     } catch (e) {}
 
@@ -5454,6 +5801,7 @@ function App() {
     syncStravaActivities().then(function (s) {
       if (s) {
         sk('pacer_strava_sync', String(Date.now()));
+        sk('pacer_last_autosync', String(Date.now()));
         setStravaStatus({
           syncing: false,
           lastSync: Date.now()
@@ -5659,7 +6007,14 @@ function App() {
   }, /*#__PURE__*/React.createElement(NavBar, {
     nav: nav,
     setNav: setNav
-  }))), /*#__PURE__*/React.createElement(Toast, {
+  }))), /*#__PURE__*/React.createElement(MorningModal, {
+    open: showMorning && screen === 'app',
+    onClose: function () {
+      setShowMorning(false);
+    },
+    userPrefs: userPrefs,
+    weather: null
+  }), /*#__PURE__*/React.createElement(Toast, {
     msg: toast
   }));
 }
