@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="PACER"/>
-<meta name="theme-color" content="#F4F4F5"/>
+<meta name="theme-color" content="#0F172A"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta http-equiv="Pragma" content="no-cache"/>
 <title>PACER</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -21,7 +20,7 @@
 @keyframes shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;-webkit-text-size-adjust:100%}
-body{background:#F4F4F5;height:100%;margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+body{background:#0F172A;height:100%;margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
 #root{height:100svh;height:100dvh;overflow:hidden}
 .fade{animation:fd .22s ease both}
 *::-webkit-scrollbar{display:none}
@@ -661,8 +660,9 @@ async function syncStravaActivities() {
       sk('pacer_strava_sync_error', 'Non-array response');
       return null;
     }
+    var RUN_TYPES = ['Run', 'TrailRun', 'VirtualRun', 'Treadmill', 'IndoorRun'];
     var runs = activities.filter(function (a) {
-      return a.type === 'Run' || a.sport_type === 'Run';
+      return RUN_TYPES.indexOf(a.type) !== -1 || RUN_TYPES.indexOf(a.sport_type) !== -1;
     });
     sk('pacer_last_autosync', String(Date.now()));
     sk('pacer_strava_sync_error', '');
@@ -2591,7 +2591,7 @@ function WeatherCard(props) {
       borderTop: '1px solid rgba(255,255,255,.07)',
       paddingTop: 10
     }
-  }, [['AQI', String(wd.aqi), wd.aqi < 100 ? C.green : wd.aqi < 150 ? C.orange : C.red], ['Humidity', wd.humidity + '%', 'rgba(255,255,255,.45)'], ['Temp', wd.temp + 'C', 'rgba(255,255,255,.45)']].map(function (item, i) {
+  }, [['AQI', String(wd.aqi), wd.aqi < 100 ? C.green : wd.aqi < 150 ? C.orange : C.red], ['Humidity', wd.humidity + '%', 'rgba(255,255,255,.45)'], ['Temp', wd.temp + String.fromCharCode(176), 'rgba(255,255,255,.45)']].map(function (item, i) {
     return /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
@@ -6876,8 +6876,10 @@ function ProfileScreen(props) {
     type: "text",
     hint: "Just the number. No secret needed here.",
     toast: showToast
-  }), /*#__PURE__*/React.createElement("a", {
-    href: stravaAuthUrl(),
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      window.location.href = stravaAuthUrl();
+    },
     style: {
       display: 'block',
       width: '100%',
@@ -6888,8 +6890,8 @@ function ProfileScreen(props) {
       fontSize: 14,
       fontWeight: 700,
       cursor: 'pointer',
-      textDecoration: 'none',
-      textAlign: 'center',
+      border: 'none',
+      fontFamily: C.F,
       marginBottom: 8
     }
   }, "Connect Strava"), /*#__PURE__*/React.createElement("div", {
@@ -6905,106 +6907,23 @@ function ProfileScreen(props) {
       fontWeight: 600,
       marginBottom: 3
     }
-  }, "Before connecting"), /*#__PURE__*/React.createElement("p", {
+  }, "If Strava asks for Google verification"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
       color: C.t3,
       lineHeight: 1.6
     }
-  }, "Make sure your Strava app's \"Authorization Callback Domain\" is set to your current site URL (e.g. yoursite.netlify.app). Set this at strava.com/settings/api"))), stravaConnected && /*#__PURE__*/React.createElement("div", null, function () {
-    var lastSync = parseInt(gk('pacer_last_autosync') || '0');
-    var syncErr = gk('pacer_strava_sync_error');
-    var runs = loadRuns();
-    var stravaRuns = (runs.runs || []).filter(function (r) {
-      return r.stravaId;
-    });
-    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: C.gFg,
-        border: '1px solid rgba(22,163,74,.15)',
-        borderRadius: 10,
-        padding: '12px 14px',
-        marginBottom: 12
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 4
-      }
-    }, /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 12,
-        color: C.green,
-        fontWeight: 600
-      }
-    }, "Connected"), lastSync > 0 && /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 10,
-        color: C.t3
-      }
-    }, "Last sync: ", new Date(lastSync).toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }))), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 11,
-        color: C.t3,
-        marginBottom: 4
-      }
-    }, stravaRuns.length, " runs synced from Strava"), syncErr && /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 11,
-        color: C.red,
-        marginTop: 4
-      }
-    }, "Last error: ", syncErr)));
-  }(), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      if (toast) toast('Syncing from Strava...');
-      syncStravaActivities().then(function (r) {
-        if (r && r.newRuns && r.newRuns.length > 0) {
-          if (toast) toast(r.newRuns.length + ' new run' + (r.newRuns.length > 1 ? 's' : '') + ' synced!');
-        } else {
-          if (toast) toast('Up to date - no new runs found');
-        }
-      }).catch(function () {
-        if (toast) toast('Sync failed - check connection');
-      });
-    },
-    style: {
-      width: '100%',
-      background: C.navy,
-      color: '#fff',
-      border: 'none',
-      borderRadius: 10,
-      padding: '12px',
-      fontSize: 13,
-      fontWeight: 700,
-      cursor: 'pointer',
-      marginBottom: 10
-    }
-  }, "Sync now from Strava"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
+  }, "Scroll down and tap \"Try another way\" -- choose SMS or authenticator app instead of the Gmail notification. The Gmail prompt fails in mobile browsers."))), stravaConnected && /*#__PURE__*/React.createElement(StravaConnectedPanel, {
+    toast: showToast,
+    onDisconnect: function () {
       sk('pacer_strava_token', '');
       sk('pacer_strava_refresh', '');
       sk('pacer_strava_expiry', '');
       sk('pacer_last_autosync', '0');
       setStravaConnected(false);
-      if (toast) toast('Strava disconnected');
-    },
-    style: {
-      width: '100%',
-      background: 'none',
-      border: '1px solid ' + C.b2,
-      borderRadius: 10,
-      padding: '12px',
-      fontSize: 13,
-      color: C.red,
-      cursor: 'pointer'
+      if (toast) toast('Disconnected');
     }
-  }, "Disconnect Strava")), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 16,
       paddingTop: 16,
@@ -9115,6 +9034,250 @@ function SaveableField(props) {
   }, hintLink))));
 }
 
+// --- STRAVA CONNECTED PANEL ---
+function StravaConnectedPanel(props) {
+  var toast = props.toast,
+    onDisconnect = props.onDisconnect;
+  var [syncing, setSyncing] = useState(false);
+  var [result, setResult] = useState('');
+  var lastSync = parseInt(gk('pacer_last_autosync') || '0');
+  var syncErr = gk('pacer_strava_sync_error');
+  var tokenExpiry = parseInt(gk('pacer_strava_expiry') || '0');
+  var tokenValid = tokenExpiry === 0 || tokenExpiry > Date.now() / 1000;
+  var runs = loadRuns().runs || [];
+  var stravaRuns = runs.filter(function (r) {
+    return r.stravaId;
+  });
+  function doSync() {
+    setSyncing(true);
+    setResult('');
+    if (toast) toast('Syncing...');
+    syncStravaActivities().then(function (r) {
+      setSyncing(false);
+      if (!r) {
+        setResult('Sync failed. Token may be expired - try reconnecting.');
+        if (toast) toast('Sync failed');
+        return;
+      }
+      if (r.newRuns && r.newRuns.length > 0) {
+        setResult(r.newRuns.length + ' new run' + (r.newRuns.length > 1 ? 's' : '') + ' added (' + r.total + ' total fetched)');
+        if (toast) toast(r.newRuns.length + ' new runs!');
+      } else {
+        setResult('No new runs found. Fetched ' + r.total + ' activities total.');
+        if (toast) toast('Up to date');
+      }
+    }).catch(function (e) {
+      setSyncing(false);
+      setResult('Error: ' + e.message);
+      if (toast) toast('Sync error');
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: '14px 16px',
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.t1
+    }
+  }, "Connection status"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 7,
+      height: 7,
+      borderRadius: '50%',
+      background: tokenValid ? C.green : C.orange
+    }
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: tokenValid ? C.green : C.orange,
+      fontWeight: 600
+    }
+  }, tokenValid ? 'Token valid' : 'Token expired'))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t3
+    }
+  }, "Runs synced to PACER"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.t1
+    }
+  }, stravaRuns.length)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t3
+    }
+  }, "Last sync"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: C.t1
+    }
+  }, lastSync > 0 ? new Date(lastSync).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  }) : 'Never')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t3
+    }
+  }, "Token expires"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: tokenValid ? C.t1 : C.red
+    }
+  }, tokenExpiry > 0 ? new Date(tokenExpiry * 1000).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  }) : 'Unknown'))), syncErr && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.rFg,
+      borderRadius: 8,
+      padding: '8px 10px',
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.red,
+      fontWeight: 600,
+      marginBottom: 2
+    }
+  }, "Last sync error"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 10,
+      color: C.red
+    }
+  }, syncErr)), result && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.bFg,
+      borderRadius: 8,
+      padding: '8px 10px',
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.blue
+    }
+  }, result))), !tokenValid && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.oFg,
+      border: '1px solid rgba(234,88,12,.2)',
+      borderRadius: 10,
+      padding: '12px 14px',
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: C.orange,
+      marginBottom: 3
+    }
+  }, "Token expired"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t2,
+      lineHeight: 1.6
+    }
+  }, "Strava access tokens expire after 6 hours. Tap \"Reconnect Strava\" below to get a fresh token and sync your runs.")), /*#__PURE__*/React.createElement("button", {
+    onClick: doSync,
+    disabled: syncing,
+    style: {
+      width: '100%',
+      background: syncing ? C.card2 : C.navy,
+      color: syncing ? C.t3 : '#fff',
+      border: 'none',
+      borderRadius: 10,
+      padding: '12px',
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: syncing ? 'not-allowed' : 'pointer',
+      marginBottom: 10,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8
+    }
+  }, syncing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spin, {
+    size: 14,
+    color: C.t3
+  }), "Syncing...") : 'Sync now (last 60 days)'), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      sk('pacer_strava_token', '');
+      sk('pacer_strava_refresh', '');
+      sk('pacer_strava_expiry', '');
+      sk('pacer_last_autosync', '0');
+      if (onDisconnect) onDisconnect();
+    },
+    style: {
+      width: '100%',
+      background: 'none',
+      border: '1px solid ' + C.b2,
+      borderRadius: 10,
+      padding: '12px',
+      fontSize: 13,
+      color: C.red,
+      cursor: 'pointer',
+      marginBottom: 8
+    }
+  }, "Disconnect and reconnect"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 10,
+      color: C.t3,
+      textAlign: 'center',
+      lineHeight: 1.6
+    }
+  }, "If runs still do not appear after reconnecting, check that the Strava app callback domain is set to ", /*#__PURE__*/React.createElement("strong", null, window.location.hostname)));
+}
+
 // --- AUTH SCREEN ---
 function AuthScreen(props) {
   var onEnter = props.onEnter;
@@ -9830,6 +9993,140 @@ function MorningModal(props) {
   }, "Let\\'s go")));
 }
 
+// --- SPLASH SCREEN ---
+function SplashScreen(props) {
+  var onDone = props.onDone;
+  var [stage, setStage] = useState(0);
+  // stage 0: logo appears, stage 1: tagline, stage 2: loading, stage 3: done
+
+  useEffect(function () {
+    var t1 = setTimeout(function () {
+      setStage(1);
+    }, 400);
+    var t2 = setTimeout(function () {
+      setStage(2);
+    }, 900);
+    // Done after minimum 2.2s - by then background work is well underway
+    var t3 = setTimeout(function () {
+      setStage(3);
+      if (onDone) onDone();
+    }, 2200);
+    return function () {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      background: C.navy,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'opacity .4s ease',
+      opacity: stage === 3 ? 0 : 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 0,
+      transform: stage >= 1 ? 'translateY(0)' : 'translateY(20px)',
+      opacity: stage >= 1 ? 1 : 0,
+      transition: 'all .5s cubic-bezier(.32,.72,0,1)'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "80",
+    height: "80",
+    viewBox: "0 0 100 100",
+    fill: "none"
+  }, /*#__PURE__*/React.createElement("text", {
+    x: "4",
+    y: "82",
+    fontFamily: "'Inter',-apple-system,sans-serif",
+    fontSize: "90",
+    fontWeight: "900",
+    fill: "#ffffff",
+    letterSpacing: "-4"
+  }, "P"), /*#__PURE__*/React.createElement("circle", {
+    cx: "74",
+    cy: "18",
+    r: "14",
+    fill: "#4285F4"
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontFamily: C.F,
+      fontSize: 28,
+      fontWeight: 900,
+      color: '#fff',
+      letterSpacing: '-1px',
+      marginTop: 8,
+      transform: stage >= 1 ? 'translateY(0)' : 'translateY(8px)',
+      opacity: stage >= 1 ? 1 : 0,
+      transition: 'all .5s cubic-bezier(.32,.72,0,1) .1s'
+    }
+  }, "PACER"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 14,
+      color: 'rgba(255,255,255,.4)',
+      fontWeight: 500,
+      marginTop: 6,
+      letterSpacing: '.2px',
+      opacity: stage >= 1 ? 1 : 0,
+      transition: 'opacity .5s ease .3s'
+    }
+  }, "The Running Intelligence for India.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      bottom: 60,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 12,
+      opacity: stage >= 2 ? 1 : 0,
+      transition: 'opacity .4s ease'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement(Spin, {
+    size: 14,
+    color: "rgba(255,255,255,.35)"
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,.3)',
+      fontWeight: 500
+    }
+  }, "Checking conditions...")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6
+    }
+  }, ['Coach', 'Weather', 'Strava'].map(function (label, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: label,
+      style: {
+        background: 'rgba(255,255,255,.08)',
+        borderRadius: 6,
+        padding: '4px 10px',
+        fontSize: 10,
+        fontWeight: 600,
+        color: 'rgba(255,255,255,.35)',
+        animation: 'pp .3s ease ' + (i * 0.1 + 0.2) + 's both'
+      }
+    }, label);
+  }))));
+}
+
 // --- NAV BAR ---
 function NavBar(props) {
   var nav = props.nav,
@@ -9872,7 +10169,7 @@ function NavBar(props) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      height: 60,
+      height: 72,
       paddingBottom: 'env(safe-area-inset-bottom,0px)'
     }
   }, tabs.map(function (t) {
@@ -9888,12 +10185,14 @@ function NavBar(props) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
+        gap: 5,
         background: 'none',
         border: 'none',
         cursor: 'pointer',
         position: 'relative',
-        paddingTop: 4
+        paddingTop: 6,
+        paddingBottom: 2,
+        minHeight: 72
       }
     }, active && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -9909,8 +10208,9 @@ function NavBar(props) {
     }), t.Ic(active), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
-        fontWeight: 600,
-        color: active ? C.navy : C.t3
+        fontWeight: active ? 700 : 500,
+        color: active ? C.navy : C.t3,
+        letterSpacing: '-.1px'
       }
     }, t.l));
   }));
@@ -9927,6 +10227,7 @@ function App() {
     lastSync: 0
   });
   var [showMorning, setShowMorning] = useState(false);
+  var [showSplash, setShowSplash] = useState(false);
   var scrollRef = useRef(null);
   function showToast(msg) {
     setToast(msg);
@@ -9996,10 +10297,20 @@ function App() {
     try {
       var s = load(K.SESSION, null);
       if (s && s.prefs && s.prefs.name) {
+        // Show splash for returning users while background work starts
+        setShowSplash(true);
         setUserPrefs(s.prefs);
-        setScreen('app');
-        var lastModal = localStorage.getItem('pacer_morning_date');
-        if (lastModal !== todayStr()) setShowMorning(true);
+        // Start background work immediately
+        var city = s.prefs.city || 'Bengaluru';
+        fetchLiveWeather(city).catch(function () {});
+        if (gk('pacer_strava_token')) syncStravaActivities().catch(function () {});
+        // After splash completes, show app
+        setTimeout(function () {
+          setScreen('app');
+          setShowSplash(false);
+          var lastModal = localStorage.getItem('pacer_morning_date');
+          if (lastModal !== todayStr()) setShowMorning(true);
+        }, 2400);
       } else {
         setScreen('auth');
       }
@@ -10008,10 +10319,14 @@ function App() {
     }
   }, []);
   useEffect(function () {
+    // Strava sync already triggered during splash for returning users
+    // This handles edge case of auth fresh login
     if (screen !== 'app') return;
-    // Sync on every app open (if token exists) - not throttled during development
-    var token = gk('pacer_strava_token');
-    if (token) doStravaSync();
+    var lastAutoSync = parseInt(gk('pacer_last_autosync') || '0');
+    if (Date.now() - lastAutoSync > 3600000) {
+      var token = gk('pacer_strava_token');
+      if (token) doStravaSync();
+    }
   }, [screen]);
   useEffect(function () {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -10028,6 +10343,12 @@ function App() {
     size: 80,
     dark: true
   }));
+  if (showSplash) return /*#__PURE__*/React.createElement(SplashScreen, {
+    onDone: function () {
+      setShowSplash(false);
+      setScreen('app');
+    }
+  });
   if (screen === 'auth') return /*#__PURE__*/React.createElement(AuthScreen, {
     onEnter: handleEnter
   });
@@ -10132,7 +10453,7 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      height: 68
+      height: 72
     }
   }, /*#__PURE__*/React.createElement(NavBar, {
     nav: nav,
