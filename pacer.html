@@ -472,10 +472,10 @@ function stripMd(t) {
   if (!t) return t;
   return t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').replace(/#{1,3} /g, '').replace(/`([^`]+)`/g, '$1').trim();
 }
-// ═══════════════════════════════════════════════
-// PACER BRAIN — Interaction Log + Simple Cache
+// ===============================================
+// PACER BRAIN -- Interaction Log + Simple Cache
 // Phase 1: Capture everything. Build data first.
-// ═══════════════════════════════════════════════
+// ===============================================
 
 var BRAIN_KEY = 'pacer_brain';
 var BRAIN_VERSION = 1;
@@ -516,7 +516,7 @@ function extractContext(user){
     ctx.aqi_band = aqi<50?'good':aqi<100?'moderate':aqi<150?'unhealthy':aqi<200?'very_unhealthy':'hazardous';
   }
   // Heat band
-  var heatMatch = user.match(/(\d+)[°\s]*C\s*heat/i)||user.match(/heat.*?(\d+)[°\s]*C/i);
+  var heatMatch = user.match(/(\d+)[\s]*C\s*heat/i)||user.match(/heat.*?(\d+)[\s]*C/i);
   if(heatMatch){
     var hi = parseInt(heatMatch[1]);
     ctx.heat_band = hi<30?'cool':hi<36?'warm':hi<40?'hot':'extreme';
@@ -544,6 +544,8 @@ function contextMatch(ctx1, ctx2){
 
 // Look for a cached answer - only serve if high confidence + matching context
 function findCachedAnswer(system, user, intent, ctx){
+  // Don't cache very short or vague questions - they lack context for reliable matching
+  if(user.trim().length < 20) return null;
   var brain = loadBrain();
   var candidates = brain.entries.filter(function(e){
     return e.intent===intent && e.confidence>=0.7;
@@ -767,6 +769,16 @@ function buildPlanStructure(runnerType,goalKm,forecast,recentRuns,todayIdx){
   var leftover=Math.max(0,remaining-eKm);
   var kpe=eDays>0?Math.round(leftover/eDays):0;
   for(var d5=0;d5<7;d5++){if(!assigned[d5])assigned[d5]={type:'easy',km:Math.max(4,Math.min(kpe,12))};}
+  // ── HARD RULE: no more than 2 consecutive run days ──
+  for(var pass=0;pass<3;pass++){
+    for(var d6=0;d6<5;d6++){
+      var a=assigned[d6],b=assigned[d6+1],c=assigned[d6+2];
+      if(a&&b&&c&&a.type!=='rest'&&b.type!=='rest'&&c.type!=='rest'){
+        // Three consecutive run days - make the middle one rest
+        if(b.type==='easy')assigned[d6+1]={type:'rest',km:0};
+      }
+    }
+  }
   return assigned.map(function(s,i){return{day:DAYS[(todayIdx+i)%7],type:s.type,km:s.km,_verdict:verdicts[i]};});
 }
 
@@ -2176,7 +2188,7 @@ function getStatePrompt(state, opts){
         return 'Time: '+hr+':00. All daytime windows have passed. Night running is a valid option in '+city+' summer. Night window: '+windowDesc(allWindows[3])+'. Late night: '+windowDesc(allWindows[4])+'. Session: '+sess[1]+(sess[2]>0?' ('+sess[2]+'km)':'')+'. '+tomorrowLine+'. Brief: (1) suggest night or late night window with heat data, (2) night running tips specific to Indian city conditions (safety+heat), (3) option to shift to tomorrow if not comfortable running at night.';
       }
     },
-    run_done: 'Run done today: '+(todayRun&&(todayRun.name2||todayRun.name)||'run')+' '+parseFloat(todayRun&&todayRun.distKm||0)+'km'+(todayRun&&todayRun.feel?' felt '+todayRun.feel:'')+'. City: '+city+'. Week: '+weeklyKm+'/'+goalKm+'km. AQI: '+wd.aqi+', heat: '+hi+String.fromCharCode(176)+'C. '+tomorrowLine+'. Brief: (1) specific comment on the run, (2) one concrete recovery action next few hours (Indian food+hydration for this exact heat), (3) one line about tomorrow.',
+    run_done: 'Run done today: '+(todayRun&&(todayRun.name2||todayRun.name)||'run')+'. Distance today: '+parseFloat(todayRun&&todayRun.distKm||0)+'km. Total this WEEK so far: '+weeklyKm+'/'+goalKm+'km.'+(todayRun&&todayRun.feel?' felt '+todayRun.feel:'')+'. City: '+city+'. Week: '+weeklyKm+'/'+goalKm+'km. AQI: '+wd.aqi+', heat: '+hi+String.fromCharCode(176)+'C. '+tomorrowLine+'. Brief: (1) specific comment on the run, (2) one concrete recovery action next few hours (Indian food+hydration for this exact heat), (3) one line about tomorrow.',
     rest_day: 'Rest day. Runner: '+runnerType+' in '+city+'. Week: '+weeklyKm+'km streak: '+streak+'. Conditions: AQI '+wd.aqi+', '+hi+String.fromCharCode(176)+'C. '+tomorrowLine+'. Brief: (1) one specific body process on rest days (real science), (2) one action today that helps tomorrow, (3) look forward to tomorrow session.',
     next_day_preview: 'After 10pm. Tomorrow: '+(tomorrow?tomorrow.name+(tomorrow.km>0?' ('+tomorrow.km+'km)':''):'run')+' -- '+(tomorrow&&tomorrow.why||'scheduled')+'. Runner: '+runnerType+' in '+city+'. Week: '+weeklyKm+'/'+goalKm+'km. Morning forecast: ~'+(Math.round(hi-7))+String.fromCharCode(176)+'C at 6am. Best window tomorrow: '+windowDesc(allWindows[0])+'. Brief: (1) tomorrow session+why, (2) one thing tonight to prepare, (3) best window and what time to set alarm.',
     late_night_run: 'Late night / post-midnight run. '+(todayRun?'Run done: '+parseFloat(todayRun.distKm||0)+'km.':'Run not logged.')+' City: '+city+'. Night temp: '+Math.round(wd.temp-8)+String.fromCharCode(176)+'C. Brief: focus on recovery and sleep. Tomorrow: '+tomorrowLine+'.'
@@ -2959,10 +2971,10 @@ function FuelCard(props){
     React.createElement('p',{style:{fontSize:10,color:C.t3,marginTop:6}},'Tell me what you ate for coaching on timing and nutrition.'));
 }
 
-// ══════════════════════════════════════════════════
-// PACER UNIFIED BRAIN — single source of truth
+// ==================================================
+// PACER UNIFIED BRAIN -- single source of truth
 // All coaching decisions flow from getAppState()
-// ══════════════════════════════════════════════════
+// ==================================================
 
 function getAppState(runs, aiPlan, userPrefs, weather){
   var hr = new Date().getHours();
@@ -3020,7 +3032,7 @@ function getAppState(runs, aiPlan, userPrefs, weather){
     if(!windows.length) windows.push({label:'Treadmill or indoors',time:'Any',verdict:'WAIT outside'});
   }
 
-  // Build the coaching message seed — what the CoachCard should focus on
+  // Build the coaching message seed -- what the CoachCard should focus on
   var coachFocus;
   var coachContext = '';
   if(phase==='rest_day'){
@@ -3300,62 +3312,7 @@ function HomeScreen(props) {
       fontSize: 10,
       color: C.t3
     }
-  }, "Coming soon"))), recentRuns.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lbl, {
-    style: {
-      marginBottom: 8
-    }
-  }, "Recent runs"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: '1px solid ' + C.b1,
-      borderRadius: 14,
-      padding: '0 16px',
-      marginBottom: 8
-    }
-  }, recentRuns.map(function (run, i) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '11px 0',
-        borderBottom: i < recentRuns.length - 1 ? '1px solid ' + C.b1 : 'none'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 36,
-        height: 36,
-        borderRadius: 9,
-        background: C.bFg,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: C.blue,
-        flexShrink: 0,
-        fontFamily: C.F,
-        fontWeight: 800,
-        fontSize: 11
-      }
-    }, run.dist), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: C.t1
-      }
-    }, run.name2 || run.name || run.label || (run.type ? run.type.charAt(0).toUpperCase()+run.type.slice(1)+' run' : 'Run')), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 11,
-        color: C.t3
-      }
-    }, run.date, run.t && run.t !== '--' ? ' | ' + run.t : '', run.pace ? ' | ' + run.pace : '')), run.feel && /*#__PURE__*/React.createElement(Bdg, {
-      color: run.feel === 'great' ? C.green : run.feel === 'tough' ? C.red : C.t3
-    }, run.feel));
-  })))), /*#__PURE__*/React.createElement(LogRunSheet, {
+  }, "Coming soon"))), /*#__PURE__*/React.createElement(LogRunSheet, {
     open: showLog,
     onClose: function () {
       setShowLog(false);
@@ -3370,7 +3327,7 @@ function HomeScreen(props) {
     city: city,
     weather: liveWeather,
     onDone: handleCheckinDone
-  }));
+  })));
 }
 
 // --- CLUBS DATA ---
@@ -4124,9 +4081,10 @@ function SessionDetailSheet(props){
   React.useEffect(function(){
     if(!session)return;
     if(session.type==='rest'){setDetail('Complete rest. No running. Your muscles are rebuilding from previous sessions. Eat protein-rich food, sleep 7-9 hours. You will run stronger tomorrow because of today.');setLoading(false);return;}
-    var heatNote=therm>20?' Heat adds +'+therm+'s per km to your effort today - your heart is working harder even at easy pace. Think of it like running with a 5kg backpack. You must slow down to keep the same internal effort level.':'';
-    var sys='You are a running coach. Explain this training session in plain language. Why it exists, what pace, how to execute it. 3-4 sentences. No markdown. Direct and encouraging.';
-    var prompt='Session: '+session.name+' ('+session.type+'), '+session.km+'km. Runner: '+((userPrefs&&userPrefs.runnerType)||'regular')+'. Today: AQI '+wd.aqi+', heat index '+hi+String.fromCharCode(176)+'C.'+heatNote+' Explain why this session is in the plan, what pace to run, and one specific tip.';
+    var heatNote=therm>20?' Today is '+hi+String.fromCharCode(176)+'C heat index. Add '+therm+' seconds to every km of your target pace. This is not optional -- running at normal pace in this heat overloads your cardiovascular system.':'';
+    var sys='You are an experienced running coach who trains Indian runners. Give a detailed, specific explanation of this training session. 4-5 sentences. No markdown, no bold, no bullet points. Explain: (1) why THIS specific session is in the plan on THIS day, (2) the exact pace target in min/km and what it should feel like in the body, (3) how to execute it -- warm up, main set, cool down if relevant, (4) what goes wrong if you skip it.';
+    var rt=(userPrefs&&userPrefs.runnerType)||'regular';
+    var prompt='Session: '+session.name+' ('+session.type+'), '+session.km+'km, today is '+session.day+'. Runner type: '+rt+'. Why this session exists in the plan: '+session.why+'. Today conditions: AQI '+wd.aqi+', heat index '+hi+String.fromCharCode(176)+'C.'+heatNote+' City: '+((userPrefs&&userPrefs.city)||'India')+'. Give a real coaching explanation -- specific, useful, honest about the conditions.';
     callClaude(sys,prompt,220,MODEL_FAST).then(function(t){setDetail(t||session.why);setLoading(false);}).catch(function(){setDetail(session.why+' '+session.tips);setLoading(false);});
   },[session&&session.name]);
   return React.createElement(Sheet,{open:true,onClose:onClose},
@@ -4220,6 +4178,78 @@ function RecoveryCard(props){
       React.createElement('p',{style:{fontSize:12,color:C.t2,lineHeight:1.5}},detail)));
 }
 
+// ── WEEK CALENDAR CARD ──
+function WeekCalendarCard(props){
+  var forecast=props.forecast||[], aiPlan=props.aiPlan, todayRun=props.todayRun, city=props.city;
+  var DAYS=['S','M','T','W','T','F','S'];
+  var today=new Date().getDay();
+  var todayStr2=new Date().toISOString().split('T')[0];
+  var SCOL={easy:C.green,tempo:'#22D3EE',intervals:C.orange,long:'#A78BFA',rest:C.t3,race:C.red};
+  var VCOL={'GO RUN':C.green,'GO EASY':C.blue,'WAIT':C.orange,'REST':C.red};
+
+  return React.createElement('div',{style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,padding:'14px 16px',marginBottom:14}},
+    React.createElement(Lbl,{style:{marginBottom:12}},'Next 7 days'),
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}},
+      Array.from({length:7}).map(function(_,i){
+        var dayIdx=(today+i)%7;
+        var dayLabel=DAYS[dayIdx];
+        var fc=forecast[i];
+        var plan=aiPlan&&aiPlan.plan&&aiPlan.plan.find(function(p){return p.day===['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayIdx];});
+        var isToday=i===0;
+        var vColor=(fc&&VCOL[fc.verdict])||C.t3;
+        var sColor=plan&&SCOL[plan.type]||C.t3;
+        var ranToday=isToday&&todayRun;
+        return React.createElement('div',{key:i,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:3}},
+          // Day label
+          React.createElement('p',{style:{fontSize:10,fontWeight:isToday?700:500,color:isToday?C.navy:C.t3}},(isToday?dayLabel:dayLabel)),
+          // Main block
+          React.createElement('div',{style:{width:'100%',borderRadius:8,padding:'6px 2px',textAlign:'center',background:isToday?(ranToday?C.gFg:C.navy):plan?sColor+'12':C.card2,border:'1px solid '+(isToday?(ranToday?C.green:C.navy):plan?sColor+'30':C.b1)}},
+            ranToday
+              ?React.createElement('p',{style:{fontSize:9,color:C.green,fontWeight:800}},'Done')
+              :plan
+                ?React.createElement('div',null,
+                  React.createElement('p',{style:{fontSize:plan.km>9?10:11,fontWeight:800,color:isToday?'#fff':sColor,lineHeight:1}},plan.km>0?plan.km+'k':'R'),
+                  React.createElement('p',{style:{fontSize:7,color:isToday?'rgba(255,255,255,.6)':C.t3,marginTop:2,textTransform:'uppercase',letterSpacing:'.5px'}},plan.type==='rest'?'rest':plan.type.substring(0,4)))
+                :React.createElement('p',{style:{fontSize:9,color:C.t3}},'--')),
+          // AQI dot
+          fc&&React.createElement('div',{style:{width:5,height:5,borderRadius:'50%',background:vColor}}));
+      })),
+    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginTop:10,paddingTop:8,borderTop:'1px solid '+C.b1}},
+      [{v:'GO RUN',c:C.green},{v:'GO EASY',c:C.blue},{v:'WAIT',c:C.orange}].map(function(l){
+        return React.createElement('div',{key:l.v,style:{display:'flex',alignItems:'center',gap:4}},
+          React.createElement('div',{style:{width:5,height:5,borderRadius:'50%',background:l.c}}),
+          React.createElement('p',{style:{fontSize:9,color:C.t3}},l.v.replace('GO ','')));
+      })));
+}
+
+// ── RECENT RUNS CARD (for Profile) ──
+function RecentRunsCard(props){
+  var runs=(props.runs||[]).slice(0,10);
+  var [open,setOpen]=React.useState(false);
+  if(!runs.length)return null;
+  var SCOL={easy:C.green,tempo:'#22D3EE',intervals:C.orange,long:'#A78BFA',rest:C.t3};
+  var FCOL={great:C.green,good:C.blue,okay:C.orange,tough:C.red};
+  return React.createElement('div',{style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,marginBottom:14,overflow:'hidden'}},
+    React.createElement('button',{onClick:function(){setOpen(!open);},style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}},
+      React.createElement('div',null,
+        React.createElement(Lbl,{style:{marginBottom:2}},'Recent runs'),
+        React.createElement('p',{style:{fontSize:12,color:C.t3}},runs.length+' runs synced'+(runs[0]?' - last '+runs[0].date:''))),
+      React.createElement('svg',{width:'14',height:'14',viewBox:'0 0 24 24',fill:'none',stroke:C.t3,strokeWidth:'2',strokeLinecap:'round',style:{transform:open?'rotate(180deg)':'none',transition:'.2s',flexShrink:0}},
+        React.createElement('polyline',{points:'6 9 12 15 18 9'}))),
+    open&&React.createElement('div',{style:{borderTop:'1px solid '+C.b1}},
+      runs.map(function(run,i){
+        var col=SCOL[run.type]||C.green;
+        var feelCol=run.feel?FCOL[run.feel]||C.t3:null;
+        return React.createElement('div',{key:i,style:{display:'flex',alignItems:'center',gap:12,padding:'11px 16px',borderBottom:i<runs.length-1?'1px solid '+C.b1:'none'}},
+          React.createElement('div',{style:{width:42,height:42,borderRadius:10,background:col+'12',border:'1px solid '+col+'25',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}},
+            React.createElement('p',{style:{fontSize:12,fontWeight:800,color:col}},run.dist||run.distKm+'k')),
+          React.createElement('div',{style:{flex:1,minWidth:0}},
+            React.createElement('p',{style:{fontSize:13,fontWeight:600,color:C.t1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}},run.name2||run.name||'Run'),
+            React.createElement('p',{style:{fontSize:11,color:C.t3}},run.date+(run.t&&run.t!=='--'?' - '+run.t:'')+(run.pace?' - '+run.pace:''))),
+          feelCol&&React.createElement(Bdg,{color:feelCol,bg:feelCol+'12'},run.feel));
+      })));
+}
+
 function TrainScreen(props) {
   var userPrefs = props.userPrefs,
     toast = props.toast;
@@ -4245,6 +4275,8 @@ function TrainScreen(props) {
   });
   var [planLoading, setPlanLoading] = useState(false);
   var [showPastRuns, setShowPastRuns] = useState(false);
+  var todayStr3=new Date().toISOString().split('T')[0];
+  var todayRun=(storeData&&storeData.runs||[]).find(function(r){return r.date===todayStr3;});
   var [sessionDetail, setSessionDetail] = useState(null);
   var [expandedDay, setExpandedDay] = useState(today);
   var SCOL = {
@@ -4427,71 +4459,7 @@ function TrainScreen(props) {
       color: C.t3,
       marginTop: 6
     }
-  }, weekPct >= 100 ? 'Weekly goal reached!' : Math.max(0, goalKm - weeklyKm) + 'km to go | ' + storeData.streak + ' run streak')), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: '1px solid ' + C.b1,
-      borderRadius: 14,
-      padding: '14px 16px',
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement(Lbl, null, "Week forecast -- plan around this"), liveWeather && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 4
-    }
-  }, /*#__PURE__*/React.createElement(IcoLive, null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      color: C.green,
-      fontWeight: 600
-    }
-  }, "LIVE"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6
-    }
-  }, forecast.slice(0, 5).map(function (fc, i) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        flex: 1,
-        background: fc.color + '10',
-        border: '1px solid ' + fc.color + '30',
-        borderRadius: 10,
-        padding: '8px 4px',
-        textAlign: 'center'
-      }
-    }, /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 10,
-        fontWeight: 600,
-        color: C.t3,
-        marginBottom: 4
-      }
-    }, fc.day), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 9,
-        fontWeight: 800,
-        color: fc.color,
-        lineHeight: 1.2
-      }
-    }, fc.verdict.replace('GO ', '')), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 9,
-        color: C.t3,
-        marginTop: 3
-      }
-    }, fc.aqi));
-  }))), runs.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, weekPct >= 100 ? 'Weekly goal reached!' : Math.max(0, goalKm - weeklyKm) + 'km to go | ' + storeData.streak + ' run streak')), /*#__PURE__*/React.createElement(WeekCalendarCard, {forecast:forecast, aiPlan:aiPlan, todayRun:todayRun, city:city}), runs.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -4501,11 +4469,7 @@ function TrainScreen(props) {
   }, /*#__PURE__*/React.createElement(Lbl, null, "Last "+(runs.length)+" sessions"),
   /*#__PURE__*/React.createElement("svg", {width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",stroke:C.t3,strokeWidth:"2",strokeLinecap:"round",style:{transform:showPastRuns?'rotate(180deg)':'none',transition:'.2s'}},
     /*#__PURE__*/React.createElement("polyline", {points:"6 9 12 15 18 9"}))),
-  showPastRuns && /*#__PURE__*/React.createElement(Lbl, {
-    style: {
-      marginBottom: 10
-    }
-  }, "Last 3 sessions"), /*#__PURE__*/React.createElement("div", {
+  showPastRuns && /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
       border: '1px solid ' + C.b1,
@@ -6302,7 +6266,7 @@ function Last7DaysCard(props) {
       padding: '16px 0',
       textAlign: 'center'
     }
-  }, "No runs logged in the last 7 days."), recentRuns.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, "No runs logged in the last 7 days."), false && recentRuns.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 4,
@@ -6754,6 +6718,7 @@ function ProfileScreen(props) {
   var [showClubs, setShowClubs] = useState(false);
   var [stravaConnected, setStravaConnected] = useState(!!gk('pacer_strava_token'));
   var stravaId = gk('pacer_strava_id');
+  var profileRuns = (loadRuns().runs||[]);
   function save(field, val) {
     var np = Object.assign({}, userPrefs, {
       [field]: val
@@ -6852,7 +6817,7 @@ function ProfileScreen(props) {
     max: userPrefs.weekGoal || 40,
     h: 5,
     color: C.navy
-  })), /*#__PURE__*/React.createElement(Last7DaysCard, null), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement(Last7DaysCard, null), /*#__PURE__*/React.createElement(RecentRunsCard, {runs: profileRuns}), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowClubs(true);
     },
@@ -7891,7 +7856,7 @@ function FounderHomeScreen(props) {
         marginBottom: 3
       }
     }, item[0]), /*#__PURE__*/React.createElement(Lbl, null, item[1]));
-  }))));
+  }))), showCreate && /*#__PURE__*/React.createElement(CreateRunSheet, {open:showCreate, onClose:function(){setShowCreate(false);}, onSave:function(runData){var fr=load('p_founder_runs',[])||[];fr.unshift(Object.assign({},runData,{id:Date.now(),createdAt:new Date().toISOString()}));store('p_founder_runs',fr);setShowCreate(false);}}));
 }
 
 // --- CREATE RUN SHEET ---
