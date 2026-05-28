@@ -1,4 +1,6 @@
-// Live weather + AQI via OpenWeatherMap - OWM_KEY is server-side
+// PACER Weather Function - Open-Meteo (no API key, better accuracy)
+// Combines weather forecast + air quality in one response
+
 const COORDS = {
   Bhubaneswar:{lat:20.2961,lon:85.8245}, Bengaluru:{lat:12.9716,lon:77.5946},
   Mumbai:{lat:19.0760,lon:72.8777},      Delhi:{lat:28.6139,lon:77.2090},
@@ -7,53 +9,90 @@ const COORDS = {
   Ahmedabad:{lat:23.0225,lon:72.5714},   Jaipur:{lat:26.9124,lon:75.7873}
 };
 
-function pm25toAQI(pm) {
-  if (pm <= 12)    return Math.round(pm * 50 / 12);
-  if (pm <= 35.4)  return Math.round(51  + (pm - 12.1)  * 49 / 23.3);
-  if (pm <= 55.4)  return Math.round(101 + (pm - 35.5)  * 49 / 19.9);
-  if (pm <= 150.4) return Math.round(151 + (pm - 55.5)  * 49 / 94.9);
-  if (pm <= 250.4) return Math.round(201 + (pm - 150.5) * 99 / 99.9);
-  return Math.round(301 + (pm - 250.5) * 100 / 149.9);
-}
-
 exports.handler = async function(event) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'public, max-age=1800', // cache 30 min
+    'Access-Control-Allow-Origin': '*'
+  };
+
   const city = event.queryStringParameters && event.queryStringParameters.city;
-  if (!city) return { statusCode: 400, body: 'city param required' };
+  if (!city) return { statusCode: 400, headers, body: JSON.stringify({ error: 'city param required' }) };
 
-  const coords = COORDS[city];
-  if (!coords) return { statusCode: 404, body: 'city not found' };
-
-  const key = process.env.OWM_KEY;
-  if (!key) return { statusCode: 500, body: 'OWM_KEY not configured' };
+  // Handle unknown cities by trying to geocode them via Open-Meteo's geocoding API
+  let coords = COORDS[city];
+  if (!coords) {
+    try {
+      const geoRes = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
+      );
+      const geoData = await geoRes.json();
+      if (geoData.results && geoData.results[0]) {
+        coords = { lat: geoData.results[0].latitude, lon: geoData.results[0].longitude };
+      } else {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'City not found' }) };
+      }
+    } catch (err) {
+      return { statusCode: 404, headers, body: JSON.stringify({ error: 'City not found' }) };
+    }
+  }
 
   try {
-    const [wRes, aRes] = await Promise.all([
-      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${coords.lat}&lon=${coords.lon}&appid=${key}&units=metric`),
-      fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${coords.lat}&lon=${coords.lon}&appid=${key}`)
+    // Fetch weather + air quality in parallel from Open-Meteo
+    const [weatherRes, aqiRes] = await Promise.all([
+      fetch(
+        `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${coords.lat}&longitude=${coords.lon}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code` +
+        `&hourly=temperature_2m&forecast_days=1&timezone=auto`
+      ),
+      fetch(
+        `https://air-quality-api.open-meteo.com/v1/air-quality` +
+        `?latitude=${coords.lat}&longitude=${coords.lon}` +
+        `&current=pm2_5,pm10,us_aqi,european_aqi` +
+        `&hourly=us_aqi,pm2_5&forecast_days=1`
+      )
     ]);
 
-    if (!wRes.ok || !aRes.ok) return { statusCode: 502, body: 'OWM request failed' };
+    if (!weatherRes.ok || !aqiRes.ok) {
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Upstream error' }) };
+    }
 
-    const [wData, aData] = await Promise.all([wRes.json(), aRes.json()]);
-    const pm25 = aData.list[0].components.pm2_5;
+    const [wData, aData] = await Promise.all([weatherRes.json(), aqiRes.json()]);
+
+    const current = wData.current;
+    const aqiCurrent = aData.current;
+
+    // Open-Meteo gives US AQI directly - no conversion needed
+    const usAqi = Math.round(aqiCurrent.us_aqi || 0);
+    const pm25 = Math.round((aqiCurrent.pm2_5 || 0) * 10) / 10;
+    const temp = Math.round(current.temperature_2m);
+    const humidity = Math.round(current.relative_humidity_2m);
+    const feelsLike = Math.round(current.apparent_temperature);
+    const wind = Math.round(current.wind_speed_10m);
+
+    // Get next 5 hours of AQI forecast for the "plan a run" feature
+    const hourlyAqi = (aData.hourly && aData.hourly.us_aqi)
+      ? aData.hourly.us_aqi.slice(0, 24)
+      : [];
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=1800'
-      },
+      headers,
       body: JSON.stringify({
-        temp:     Math.round(wData.main.temp),
-        humidity: wData.main.humidity,
-        aqi:      pm25toAQI(pm25),
-        pm25:     Math.round(pm25 * 10) / 10,
-        desc:     wData.weather[0].description,
-        wind:     Math.round((wData.wind && wData.wind.speed) || 0),
-        live:     true
+        temp,
+        humidity,
+        feelsLike,
+        aqi: usAqi,
+        pm25,
+        wind,
+        live: true,
+        source: 'open-meteo',
+        hourlyAqi: hourlyAqi.filter(v => v !== null).slice(0, 12)
       })
     };
+
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
   }
 };
