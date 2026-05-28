@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-title" content="PACER"/>
 <meta name="theme-color" content="#F4F4F5"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
 <title>PACER</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -634,23 +635,40 @@ function stravaAuthUrl() {
 }
 async function syncStravaActivities() {
   var token = getStravaToken();
-  if (!token) return null;
+  if (!token) {
+    // Try to refresh
+    var newToken = await refreshStravaToken();
+    if (!newToken) return null;
+    token = newToken;
+  }
+  // First sync: get last 60 days. Subsequent: last 2 days overlap
   var lastSync = parseInt(gk('pacer_last_autosync') || '0');
-  var after = lastSync ? Math.floor(lastSync / 1000) - 300 : Math.floor((Date.now() - 8 * 86400000) / 1000);
+  var isFirstSync = lastSync === 0;
+  var after = isFirstSync ? Math.floor((Date.now() - 60 * 86400000) / 1000) : Math.floor(lastSync / 1000) - 7200; // 2hr overlap
+  var perPage = isFirstSync ? 50 : 20;
   try {
-    var res = await fetch('https://www.strava.com/api/v3/athlete/activities?after=' + after + '&per_page=10', {
+    var res = await fetch('https://www.strava.com/api/v3/athlete/activities?after=' + after + '&per_page=' + perPage, {
       headers: {
         Authorization: 'Bearer ' + token
       }
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      sk('pacer_strava_sync_error', res.status + ' ' + (await res.text()));
+      return null;
+    }
     var activities = await res.json();
+    if (!Array.isArray(activities)) {
+      sk('pacer_strava_sync_error', 'Non-array response');
+      return null;
+    }
     var runs = activities.filter(function (a) {
       return a.type === 'Run' || a.sport_type === 'Run';
     });
     sk('pacer_last_autosync', String(Date.now()));
+    sk('pacer_strava_sync_error', '');
     if (!runs.length) return {
-      newRuns: []
+      newRuns: [],
+      total: 0
     };
     var existing = loadRuns();
     var existingIds = new Set((existing.runs || []).map(function (r) {
@@ -660,23 +678,32 @@ async function syncStravaActivities() {
       return !existingIds.has(r.id);
     });
     var formatted = runs.map(function (r) {
+      var distKm = Math.round(r.distance / 100) / 10;
       return {
         name: r.name || 'Run',
         label: 'Run',
-        distKm: Math.round(r.distance / 100) / 10,
-        dist: Math.round(r.distance / 100) / 10 + 'km',
+        distKm: distKm,
+        dist: distKm + 'km',
         mins: Math.round(r.moving_time / 60),
         t: fmtTime(r.moving_time),
         pace: r.average_speed > 0 ? fmtPace(r.average_speed) : null,
+        paceNum: r.average_speed > 0 ? Math.round(1000 / r.average_speed) : null,
         heartRate: r.average_heartrate ? Math.round(r.average_heartrate) : null,
+        maxHR: r.max_heartrate ? Math.round(r.max_heartrate) : null,
+        elevation: r.total_elevation_gain ? Math.round(r.total_elevation_gain) : 0,
         feel: 'good',
         ok: true,
         date: r.start_date && r.start_date.split('T')[0],
+        startTime: r.start_date_local,
         stravaId: r.id,
-        type: 'easy'
+        type: r.workout_type === 3 ? 'race' : r.workout_type === 2 ? 'long' : r.workout_type === 1 ? 'intervals' : 'easy',
+        name2: r.name
       };
     });
     var s = mergeStravaRuns(formatted);
+
+    // Run history analysis after sync
+    if (formatted.length >= 3) analyzeAndCacheRunHistory(formatted);
     return {
       newRuns: newOnes.map(function (r) {
         return formatted.find(function (f) {
@@ -684,11 +711,121 @@ async function syncStravaActivities() {
         });
       }).filter(Boolean),
       latestRun: formatted[0],
-      store: s
+      store: s,
+      total: formatted.length
     };
   } catch (e) {
+    sk('pacer_strava_sync_error', e.message);
     return null;
   }
+}
+
+// --- RUN HISTORY ANALYSIS ---
+var RUN_ANALYSIS_KEY = 'p_run_analysis';
+function analyzeAndCacheRunHistory(runs) {
+  if (!runs || runs.length < 2) return;
+  var analysis = {};
+
+  // Volume trend (last 4 weeks)
+  var weeks = {};
+  runs.forEach(function (r) {
+    if (!r.date) return;
+    var d = new Date(r.date + 'T12:00:00');
+    var mon = new Date(d);
+    mon.setDate(d.getDate() - d.getDay() + 1);
+    var wk = mon.toISOString().split('T')[0];
+    if (!weeks[wk]) weeks[wk] = {
+      km: 0,
+      runs: 0,
+      paces: []
+    };
+    weeks[wk].km = Math.round((weeks[wk].km + (r.distKm || 0)) * 10) / 10;
+    weeks[wk].runs++;
+    if (r.paceNum) weeks[wk].paces.push(r.paceNum);
+  });
+  var wkKeys = Object.keys(weeks).sort().slice(-4);
+  analysis.weeklyKms = wkKeys.map(function (k) {
+    return {
+      week: k,
+      km: weeks[k].km,
+      runs: weeks[k].runs
+    };
+  });
+  analysis.avgWeeklyKm = analysis.weeklyKms.length > 0 ? Math.round(analysis.weeklyKms.reduce(function (s, w) {
+    return s + w.km;
+  }, 0) / analysis.weeklyKms.length * 10) / 10 : 0;
+
+  // Pace trend
+  var pacedRuns = runs.filter(function (r) {
+    return r.paceNum && r.paceNum > 0;
+  }).slice(0, 10);
+  if (pacedRuns.length >= 2) {
+    analysis.avgPaceSec = Math.round(pacedRuns.reduce(function (s, r) {
+      return s + r.paceNum;
+    }, 0) / pacedRuns.length);
+    var recent5 = pacedRuns.slice(0, 5),
+      older5 = pacedRuns.slice(5);
+    if (older5.length >= 2) {
+      var recentAvg = recent5.reduce(function (s, r) {
+        return s + r.paceNum;
+      }, 0) / recent5.length;
+      var olderAvg = older5.reduce(function (s, r) {
+        return s + r.paceNum;
+      }, 0) / older5.length;
+      analysis.paceTrend = recentAvg < olderAvg ? 'improving' : recentAvg > olderAvg + 10 ? 'slower' : 'steady';
+    }
+  }
+
+  // Consistency
+  analysis.totalRuns = runs.length;
+  analysis.avgDistKm = Math.round(runs.reduce(function (s, r) {
+    return s + (r.distKm || 0);
+  }, 0) / runs.length * 10) / 10;
+
+  // Longest run
+  var longest = runs.reduce(function (a, b) {
+    return (b.distKm || 0) > (a.distKm || 0) ? b : a;
+  }, {
+    distKm: 0
+  });
+  analysis.longestKm = longest.distKm;
+  analysis.longestDate = longest.date;
+
+  // Feel patterns
+  var feelCounts = {
+    great: 0,
+    good: 0,
+    okay: 0,
+    tough: 0
+  };
+  runs.forEach(function (r) {
+    if (r.feel && feelCounts[r.feel] !== undefined) feelCounts[r.feel]++;
+  });
+  analysis.feelCounts = feelCounts;
+
+  // HR data if available
+  var hRuns = runs.filter(function (r) {
+    return r.heartRate && r.heartRate > 100;
+  });
+  if (hRuns.length > 2) {
+    analysis.avgHR = Math.round(hRuns.reduce(function (s, r) {
+      return s + r.heartRate;
+    }, 0) / hRuns.length);
+  }
+  analysis.generatedAt = Date.now();
+  analysis.sampleSize = runs.length;
+  store(RUN_ANALYSIS_KEY, analysis);
+  return analysis;
+}
+function loadRunAnalysis() {
+  return load(RUN_ANALYSIS_KEY, null);
+}
+function formatAnalysisForPrompt(analysis) {
+  if (!analysis) return '';
+  var lines = ['Run history analysis (' + analysis.sampleSize + ' runs from Strava):', '- Avg weekly km: ' + analysis.avgWeeklyKm + 'km', '- Total runs analysed: ' + analysis.totalRuns, '- Avg run distance: ' + analysis.avgDistKm + 'km', '- Longest run: ' + analysis.longestKm + 'km' + (analysis.longestDate ? ' on ' + analysis.longestDate : ''), analysis.avgPaceSec ? '- Average pace: ' + Math.floor(analysis.avgPaceSec / 60) + ':' + String(analysis.avgPaceSec % 60).padStart(2, '0') + '/km' : '', analysis.paceTrend ? '- Pace trend: ' + analysis.paceTrend : '', analysis.avgHR ? '- Average heart rate: ' + analysis.avgHR + 'bpm' : '', analysis.weeklyKms && analysis.weeklyKms.length > 1 ? '- Recent weeks: ' + analysis.weeklyKms.map(function (w) {
+    return w.km + 'km';
+  }).join(', ') : ''];
+  return lines.filter(Boolean).join('\n');
 }
 
 // --- TRAINING PLANS ---
@@ -1685,12 +1822,14 @@ function CoachCard(props) {
       return d.label + ' ' + d.km + 'km';
     }).join(', ') || 'no recent runs';
     var cmem = loadCoachMem();
+    var runAnalysis = loadRunAnalysis();
+    var analysisStr = runAnalysis ? formatAnalysisForPrompt(runAnalysis) : '';
     var isCasual = runMode === 'casual';
     var system = isCasual ? 'You are a friendly running coach. Keep it simple and encouraging. 2 sentences max. No jargon. End with one easy action.' : 'You are PACER, expert Indian running coach. Jack Daniels 80/20 methodology. Generate a proactive morning briefing: specific session today, conditions impact, one key focus. 2-3 sentences. No emojis. Direct. Like a knowledgeable friend.';
     var prompt = ['Runner: ' + runnerType + ' | City: ' + city + ' | ' + new Date().toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit'
-    }), 'Conditions: AQI ' + (wd.live ? '(LIVE) ' : '') + wd.aqi + ' | Heat index: ' + hi + 'C | Effort penalty: +' + therm + 's/km | Verdict: ' + verd.v, 'Today: ' + sess[1] + (sess[2] > 0 ? ' (' + sess[2] + 'km)' : '') + ' | Plan: ' + (PLANS[planType] && PLANS[planType].name || 'General'), 'Week: ' + weeklyKm + '/' + goalKm + 'km | Streak: ' + streak + ' runs', 'Recent: ' + recentStr, '5-day forecast: ' + fStr + (badDays >= 3 ? ' -- ' + badDays + '/5 days have poor conditions' : ''), sleepVal ? 'Sleep: ' + sleepVal : '', cmem.lastCoachingNote ? 'Last note: ' + cmem.lastCoachingNote.substring(0, 80) : '', '', 'Write the briefing now. Be specific about today.'].filter(Boolean).join('\n');
+    }), 'Conditions: AQI ' + (wd.live ? '(LIVE) ' : '') + wd.aqi + ' | Heat index: ' + hi + 'C | Effort penalty: +' + therm + 's/km | Verdict: ' + verd.v, 'Today: ' + sess[1] + (sess[2] > 0 ? ' (' + sess[2] + 'km)' : '') + ' | Plan: ' + (PLANS[planType] && PLANS[planType].name || 'General'), 'Week: ' + weeklyKm + '/' + goalKm + 'km | Streak: ' + streak + ' runs', 'Recent: ' + recentStr, '5-day forecast: ' + fStr + (badDays >= 3 ? ' -- ' + badDays + '/5 days have poor conditions' : ''), sleepVal ? 'Sleep: ' + sleepVal : '', cmem.lastCoachingNote ? 'Last note: ' + cmem.lastCoachingNote.substring(0, 80) : '', analysisStr ? analysisStr : '', '', 'Write the briefing now. Be specific. Reference their actual fitness data if available.'].filter(Boolean).join('\n');
     callClaude(system, prompt, 220, MODEL_DEEP).then(function (text) {
       var finalText = text && text.length > 15 ? text : getFallbackBrief(sess, wd, verd, therm, weeklyKm, goalKm, runMode);
       setBrief(finalText);
@@ -5918,6 +6057,163 @@ function Last7DaysCard(props) {
   })))));
 }
 
+// --- RUN INSIGHTS CARD ---
+function RunInsightsCard() {
+  var analysis = loadRunAnalysis();
+  var runs = loadRuns().runs || [];
+  var stravaCount = runs.filter(function (r) {
+    return r.stravaId;
+  }).length;
+  if (!analysis && stravaCount === 0) return null;
+  var PACE_COLOR = {
+    improving: C.green,
+    steady: C.blue,
+    slower: C.orange
+  };
+  var avgPaceStr = analysis && analysis.avgPaceSec ? Math.floor(analysis.avgPaceSec / 60) + ':' + String(analysis.avgPaceSec % 60).padStart(2, '0') + '/km' : null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: '1px solid ' + C.b1,
+      borderRadius: 14,
+      padding: '16px 18px',
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, null, "Your fitness picture"), analysis && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 10,
+      color: C.t3
+    }
+  }, analysis.sampleSize, " runs analysed")), !analysis && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: C.t3
+    }
+  }, "Sync Strava to unlock fitness insights."), analysis && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 8,
+      marginBottom: 12
+    }
+  }, [{
+    l: 'Weekly avg',
+    v: analysis.avgWeeklyKm + 'km',
+    c: C.navy
+  }, {
+    l: 'Avg run',
+    v: analysis.avgDistKm + 'km',
+    c: C.t1
+  }, avgPaceStr ? {
+    l: 'Avg pace',
+    v: avgPaceStr,
+    c: C.t1
+  } : null, analysis.longestKm ? {
+    l: 'Longest run',
+    v: analysis.longestKm + 'km',
+    c: C.blue
+  } : null].filter(Boolean).map(function (item, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        background: C.card2,
+        borderRadius: 10,
+        padding: '10px 12px'
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontFamily: C.F,
+        fontSize: 15,
+        fontWeight: 800,
+        color: item.c,
+        marginBottom: 2
+      }
+    }, item.v), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 10,
+        color: C.t3,
+        textTransform: 'uppercase',
+        letterSpacing: '1px'
+      }
+    }, item.l));
+  })), analysis.paceTrend && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      background: PACE_COLOR[analysis.paceTrend] + '10',
+      border: '1px solid ' + PACE_COLOR[analysis.paceTrend] + '25',
+      borderRadius: 10,
+      padding: '10px 12px',
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: '50%',
+      background: PACE_COLOR[analysis.paceTrend],
+      flexShrink: 0
+    }
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: PACE_COLOR[analysis.paceTrend]
+    }
+  }, "Pace ", analysis.paceTrend === 'improving' ? 'improving' : 'steady', " based on last 10 runs")), analysis.weeklyKms && analysis.weeklyKms.length >= 2 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t3,
+      marginBottom: 6
+    }
+  }, "Weekly volume (last ", analysis.weeklyKms.length, " weeks)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 4,
+      alignItems: 'flex-end',
+      height: 36
+    }
+  }, function () {
+    var maxKm = Math.max.apply(null, analysis.weeklyKms.map(function (w) {
+      return w.km;
+    })) || 1;
+    return analysis.weeklyKms.map(function (w, i) {
+      var h = Math.max(4, Math.round(w.km / maxKm * 36));
+      var isLast = i === analysis.weeklyKms.length - 1;
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2
+        }
+      }, /*#__PURE__*/React.createElement("p", {
+        style: {
+          fontSize: 8,
+          color: isLast ? C.navy : C.t3
+        }
+      }, w.km, "k"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: '100%',
+          height: h,
+          background: isLast ? C.navy : C.blue + '50',
+          borderRadius: '3px 3px 0 0'
+        }
+      }));
+    });
+  }()))));
+}
+
 // --- YOUR CLUB CARD (profile) ---
 function YourClubCard(props) {
   var userPrefs = props.userPrefs;
@@ -6615,27 +6911,56 @@ function ProfileScreen(props) {
       color: C.t3,
       lineHeight: 1.6
     }
-  }, "Make sure your Strava app's \"Authorization Callback Domain\" is set to your current site URL (e.g. yoursite.netlify.app). Set this at strava.com/settings/api"))), stravaConnected && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.gFg,
-      border: '1px solid rgba(22,163,74,.15)',
-      borderRadius: 10,
-      padding: '12px 14px',
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: C.green,
-      fontWeight: 600,
-      marginBottom: 2
-    }
-  }, "Connected"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 11,
-      color: C.t3
-    }
-  }, "Syncs automatically when you open the app. New runs appear here.")), /*#__PURE__*/React.createElement("button", {
+  }, "Make sure your Strava app's \"Authorization Callback Domain\" is set to your current site URL (e.g. yoursite.netlify.app). Set this at strava.com/settings/api"))), stravaConnected && /*#__PURE__*/React.createElement("div", null, function () {
+    var lastSync = parseInt(gk('pacer_last_autosync') || '0');
+    var syncErr = gk('pacer_strava_sync_error');
+    var runs = loadRuns();
+    var stravaRuns = (runs.runs || []).filter(function (r) {
+      return r.stravaId;
+    });
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.gFg,
+        border: '1px solid rgba(22,163,74,.15)',
+        borderRadius: 10,
+        padding: '12px 14px',
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 12,
+        color: C.green,
+        fontWeight: 600
+      }
+    }, "Connected"), lastSync > 0 && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 10,
+        color: C.t3
+      }
+    }, "Last sync: ", new Date(lastSync).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }))), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: C.t3,
+        marginBottom: 4
+      }
+    }, stravaRuns.length, " runs synced from Strava"), syncErr && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: C.red,
+        marginTop: 4
+      }
+    }, "Last error: ", syncErr)));
+  }(), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       if (toast) toast('Syncing from Strava...');
       syncStravaActivities().then(function (r) {
@@ -6660,7 +6985,7 @@ function ProfileScreen(props) {
       cursor: 'pointer',
       marginBottom: 10
     }
-  }, "Sync now"), /*#__PURE__*/React.createElement("button", {
+  }, "Sync now from Strava"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       sk('pacer_strava_token', '');
       sk('pacer_strava_refresh', '');
