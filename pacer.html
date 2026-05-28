@@ -538,41 +538,53 @@ async function getPostRunAdvice(distKm, feel, sessType, city, weather) {
   var hi = hiCalc(wd.temp, wd.humidity);
   return callClaude('You are PACER. Post-run recovery coach. 2 sentences. Specific Indian foods (curd rice, sattu, coconut water, ORS, banana+milk). One action now, one for tomorrow.', 'Finished ' + distKm + 'km ' + sessType + '. Felt: ' + feel + '. City:' + city + ' heat index ' + hi + 'C.', 130, MODEL_FAST);
 }
-async function generateAIWeekPlan(userPrefs, recentRuns, weather) {
-  var goal = userPrefs.goal || 'fitness';
-  var runnerType = userPrefs.runnerType || 'regular';
-  var weeklyKm = loadRuns().weeklyKm || 0;
-  var goalKm = userPrefs.weekGoal || 40;
-  var streak = loadRuns().streak || 0;
-  var city = userPrefs.city || 'Bengaluru';
-  var forecast = getWeekForecast(city, 7);
-  var forecastStr = forecast.map(function (d) {
-    return d.day + ':AQI' + d.aqi + '(' + d.verdict + ')';
-  }).join(' ');
-  var recentStr = (recentRuns || []).slice(0, 5).map(function (r) {
-    return r.dist + ' ' + r.type + ' felt:' + r.feel;
-  }).join(', ') || 'no recent runs';
-  var prompt = ['Runner: ' + runnerType + ' | Goal: ' + goal + ' | This week: ' + weeklyKm + '/' + goalKm + 'km | Streak: ' + streak, 'City: ' + city + ' | 7-day forecast: ' + forecastStr, 'Recent: ' + recentStr, '', 'Generate 7-day training plan as JSON only. No markdown. Format:', '{"plan":[{"day":"Mon","type":"easy","name":"Session name","km":5,"why":"1 sentence reason","tips":"1 specific tip"},...]}'].join('\n');
-  try {
-    var text = await callClaude('You are an expert running coach. Output ONLY valid JSON, no markdown, no explanation.', prompt, 900, MODEL_DEEP);
-    if (!text) return null;
-    var cleaned = text.replace(/```json|```/g, '').trim();
-    var parsed = JSON.parse(cleaned);
-    if (parsed && parsed.plan && parsed.plan.length > 0) {
-      var saved = {
-        plan: parsed.plan,
-        city: city,
-        generatedAt: Date.now(),
-        goal: goal
-      };
+async function generateAIWeekPlan(userPrefs,recentRuns,weather){
+  var goal=userPrefs.goal||'fitness';
+  var runnerType=userPrefs.runnerType||'regular';
+  var weeklyKm=loadRuns().weeklyKm||0;
+  var goalKm=userPrefs.weekGoal||40;
+  var streak=loadRuns().streak||0;
+  var city=userPrefs.city||'Bengaluru';
+  var wd=weather||getStaticWeather(city);
+  var forecast=getWeekForecast(city,7);
+  var todayDay=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+  var goodDays=forecast.filter(function(d){return d.verdict==='GO RUN'||d.verdict==='GO EASY';}).map(function(d){return d.day;});
+  var badDays=forecast.filter(function(d){return d.verdict==='WAIT'||d.verdict==='REST';}).map(function(d){return d.day;});
+  var recentStr=(recentRuns||[]).slice(0,3).map(function(r){return (r.distKm||r.dist||'?')+'km '+(r.type||'easy');}).join(', ')||'no recent runs';
+  var system='You are a running coach. Return ONLY a raw JSON object. Nothing before or after it. Start with { and end with }.';
+  var prompt='Plan for: '+runnerType+' runner, goal '+goal+', city '+city+', week '+weeklyKm+'/'+goalKm+'km. Good days: '+(goodDays.join(',')||'none')+'. Bad days: '+(badDays.join(',')||'none')+'. Recent: '+recentStr+'. Streak: '+streak+'. Start from '+todayDay+'. 7 days. 2+ rest days. Hard sessions only on good days. Return: {"plan":[{"day":"'+todayDay+'","type":"easy","name":"Easy run","km":8,"why":"base building","tips":"conversational pace"}]}';
+  try{
+    var text=await callClaude(system,prompt,700,MODEL_FAST);
+    if(!text||text.length<10)throw new Error('empty');
+    var cleaned=text.replace(/```json|```/g,'').trim();
+    var jsonStart=cleaned.indexOf('{');
+    var jsonEnd=cleaned.lastIndexOf('}');
+    if(jsonStart<0||jsonEnd<=jsonStart)throw new Error('no json');
+    cleaned=cleaned.substring(jsonStart,jsonEnd+1);
+    var parsed=JSON.parse(cleaned);
+    if(parsed&&parsed.plan&&Array.isArray(parsed.plan)&&parsed.plan.length>0){
+      var saved={plan:parsed.plan,city:city,generatedAt:Date.now(),goal:goal};
       saveAIPlan(saved);
       return saved;
     }
-  } catch (err) {
-    console.warn('AI plan error:', err);
+    throw new Error('invalid');
+  }catch(err){
+    console.warn('AI plan error:',err.message);
+    try{
+      var text2=await callClaude('Return ONLY valid JSON, nothing else.','7-day running plan JSON for '+runnerType+' runner goal '+goal+' in '+city+'. Start '+todayDay+'. Format: {"plan":[{"day":"'+todayDay+'","type":"easy","name":"Easy run","km":8,"why":"base building","tips":"conversational pace"}]}',500,MODEL_FAST);
+      if(text2&&text2.length>10){
+        var c2=text2.replace(/```json|```/g,'').trim();
+        var s2=c2.indexOf('{'),e2=c2.lastIndexOf('}');
+        if(s2>=0&&e2>s2){
+          var p2=JSON.parse(c2.substring(s2,e2+1));
+          if(p2&&p2.plan&&p2.plan.length>0){var saved2={plan:p2.plan,city:city,generatedAt:Date.now(),goal:goal};saveAIPlan(saved2);return saved2;}
+        }
+      }
+    }catch(e2){console.warn('Retry failed:',e2.message);}
+    return null;
   }
-  return null;
 }
+
 async function buildBriefing(p) {
   var city = p.city,
     planType = p.planType,
@@ -3864,7 +3876,7 @@ function TrainScreen(props) {
       setAiPlan(plan);
       toast && toast('Plan ready!');
     } else {
-      toast && toast('Could not generate plan. Check API key.');
+      toast && toast('Plan generation timed out. Trying again...');
     }
     setPlanLoading(false);
   }
