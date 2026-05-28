@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="PACER"/>
 <meta name="theme-color" content="#F4F4F5"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <title>PACER</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -1648,51 +1649,90 @@ function CoachCard(props) {
     weeklyKm = props.weeklyKm,
     goalKm = props.goalKm,
     streak = props.streak,
-    weather = props.weather;
+    weather = props.weather,
+    runMode = props.runMode || 'training';
   var today = todayStr();
   var todayLog = loadLog()[today] || {};
-  var hasSleep = !!todayLog.sleep;
   var briefs = loadBrief();
-  var [phase, setPhase] = useState(hasSleep ? briefs[today] ? 'brief' : 'loading' : 'sleep');
   var [brief, setBrief] = useState(briefs[today] || '');
+  var [loading, setLoading] = useState(!briefs[today]);
   var [sleep, setSleep] = useState(todayLog.sleep || '');
   var [msg, setMsg] = useState('');
   var [reply, setReply] = useState('');
   var [chatMode, setChatMode] = useState(false);
   var [asking, setAsking] = useState(false);
+  var [showSleep, setShowSleep] = useState(false);
   var inputRef = useRef(null);
-  useEffect(function () {
-    if (phase === 'loading') {
-      var ctx = getCoachContext();
-      buildBriefing({
-        city: city,
-        planType: planType,
-        runnerType: runnerType,
-        weeklyKm: weeklyKm,
-        goalKm: goalKm,
-        streak: streak,
-        ctx: ctx,
-        weather: weather
-      }).then(function (text) {
-        if (text) {
-          setBrief(text);
-          saveBrief(today, text);
-        }
-        setPhase('brief');
-      }).catch(function () {
-        setPhase('brief');
-      });
+  function genBrief(sleepVal) {
+    setLoading(true);
+    setBrief('');
+    var wd = weather || getStaticWeather(city);
+    var hi = hiCalc(wd.temp, wd.humidity);
+    var therm = thermalCalc(hi, wd.humidity);
+    var verd = getVerdict(wd.aqi, hi);
+    var sess = getSession(planType);
+    var ctx = getCoachContext();
+    var forecast = getWeekForecast(city, 5);
+    var fStr = forecast.map(function (d) {
+      return d.day + '(AQI' + d.aqi + ',' + d.verdict + ')';
+    }).join(' ');
+    var badDays = forecast.filter(function (d) {
+      return d.verdict === 'WAIT' || d.verdict === 'REST';
+    }).length;
+    var recentStr = ctx.days.filter(function (d) {
+      return d.ran;
+    }).slice(0, 3).map(function (d) {
+      return d.label + ' ' + d.km + 'km';
+    }).join(', ') || 'no recent runs';
+    var cmem = loadCoachMem();
+    var isCasual = runMode === 'casual';
+    var system = isCasual ? 'You are a friendly running coach. Keep it simple and encouraging. 2 sentences max. No jargon. End with one easy action.' : 'You are PACER, expert Indian running coach. Jack Daniels 80/20 methodology. Generate a proactive morning briefing: specific session today, conditions impact, one key focus. 2-3 sentences. No emojis. Direct. Like a knowledgeable friend.';
+    var prompt = ['Runner: ' + runnerType + ' | City: ' + city + ' | ' + new Date().toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }), 'Conditions: AQI ' + (wd.live ? '(LIVE) ' : '') + wd.aqi + ' | Heat index: ' + hi + 'C | Effort penalty: +' + therm + 's/km | Verdict: ' + verd.v, 'Today: ' + sess[1] + (sess[2] > 0 ? ' (' + sess[2] + 'km)' : '') + ' | Plan: ' + (PLANS[planType] && PLANS[planType].name || 'General'), 'Week: ' + weeklyKm + '/' + goalKm + 'km | Streak: ' + streak + ' runs', 'Recent: ' + recentStr, '5-day forecast: ' + fStr + (badDays >= 3 ? ' -- ' + badDays + '/5 days have poor conditions' : ''), sleepVal ? 'Sleep: ' + sleepVal : '', cmem.lastCoachingNote ? 'Last note: ' + cmem.lastCoachingNote.substring(0, 80) : '', '', 'Write the briefing now. Be specific about today.'].filter(Boolean).join('\n');
+    callClaude(system, prompt, 220, MODEL_DEEP).then(function (text) {
+      var finalText = text && text.length > 15 ? text : getFallbackBrief(sess, wd, verd, therm, weeklyKm, goalKm, runMode);
+      setBrief(finalText);
+      saveBrief(today, finalText);
+      setLoading(false);
+    }).catch(function () {
+      setBrief(getFallbackBrief(sess, wd, verd, therm, weeklyKm, goalKm, runMode));
+      setLoading(false);
+    });
+  }
+  function getFallbackBrief(sess, wd, verd, therm, wkm, gkm, mode) {
+    if (mode === 'casual') {
+      if (sess[0] === 'rest') return 'Rest day today. Your body is recovering and getting stronger. Get out tomorrow.';
+      return 'Today is a ' + sess[1].toLowerCase() + (sess[2] > 0 ? ', ' + sess[2] + 'km' : '') + '. ' + (verd.v !== 'GO RUN' ? 'Conditions are tough, keep it short and easy.' : 'Good conditions today, go enjoy it.');
     }
-  }, [phase]);
+    if (sess[0] === 'rest') return 'Rest day. ' + wkm + 'km done this week' + (wkm >= gkm ? ' -- goal reached!' : ' of ' + gkm + 'km goal.') + ' Adaptation happens now. Stay off your feet, eat well.';
+    var c = therm > 15 ? ' Conditions brutal -- run +' + therm + 's/km slower.' : verd.v === 'GO RUN' ? ' Good conditions.' : ' AQI ' + wd.aqi + ', keep effort easy.';
+    return sess[1] + ' today -- ' + sess[2] + 'km.' + c + ' ' + wkm + '/' + gkm + 'km this week.';
+  }
+
+  // Auto-generate on first mount
+  useEffect(function () {
+    if (!briefs[today]) {
+      genBrief(todayLog.sleep || '');
+    }
+  }, []);
   function pickSleep(val) {
     setSleep(val);
     saveLog(today, {
       sleep: val
     });
-    setPhase('loading');
+    setShowSleep(false);
+    // Regenerate with sleep context
+    var b = loadBrief();
+    delete b[today];
+    store(K.BRIEF, b);
+    genBrief(val);
   }
   async function ask() {
     if (!msg.trim() || asking) return;
+    var m = msg;
+    setMsg('');
     setAsking(true);
     setChatMode(true);
     var wd = weather || getStaticWeather(city);
@@ -1703,12 +1743,12 @@ function CoachCard(props) {
     }).slice(0, 3).map(function (d) {
       return d.label + ' ' + d.km + 'km';
     }).join(', ');
-    var ctxStr = 'City:' + city + ' AQI:' + wd.aqi + ' Heat:' + hi + 'C | Plan:' + (PLANS[planType] && PLANS[planType].name || 'General') + ' | ' + weeklyKm + '/' + goalKm + 'km streak:' + streak + (recentStr ? ' | Recent:' + recentStr : '') + ' | Sleep:' + (sleep || 'not logged');
+    var ctxStr = 'City:' + city + ' AQI:' + wd.aqi + ' Heat:' + hi + 'C | ' + (PLANS[planType] && PLANS[planType].name || 'General') + ' | ' + weeklyKm + '/' + goalKm + 'km | Streak:' + streak + (recentStr ? ' | Recent:' + recentStr : '') + ' | Sleep:' + (sleep || 'not logged');
     try {
-      var r = await askCoach(msg, ctxStr);
+      var r = await askCoach(m, ctxStr);
       setReply(r);
     } catch (e) {
-      setReply("Couldn't reach the coach. Add your Claude API key in Profile.");
+      setReply('Could not reach coach. Check your API key in Profile.');
     }
     setAsking(false);
   }
@@ -1736,7 +1776,7 @@ function CoachCard(props) {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      marginBottom: 12
+      marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
@@ -1755,7 +1795,13 @@ function CoachCard(props) {
     weekday: 'long',
     day: 'numeric',
     month: 'short'
-  }))), weather && weather.live && /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      alignItems: 'center'
+    }
+  }, weather && weather.live && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -1771,22 +1817,28 @@ function CoachCard(props) {
       fontWeight: 600,
       letterSpacing: '1px'
     }
-  }, "LIVE"))), phase === 'sleep' && /*#__PURE__*/React.createElement("div", {
+  }, "LIVE")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowSleep(!showSleep);
+    },
     style: {
-      marginBottom: 14
+      background: 'rgba(255,255,255,.08)',
+      border: 'none',
+      borderRadius: 8,
+      padding: '5px 10px',
+      cursor: 'pointer',
+      fontSize: 10,
+      color: 'rgba(255,255,255,.4)',
+      fontFamily: C.F
     }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, sleep ? 'Sleep: ' + sleep : 'Log sleep'))), showSleep && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 14,
-      color: 'rgba(255,255,255,.8)',
-      marginBottom: 14,
-      lineHeight: 1.6
+      marginBottom: 10
     }
-  }, "Before I brief you -- how did you sleep?"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      gap: 8,
-      marginBottom: 12
+      gap: 8
     }
   }, [['poor', 'Rough'], ['ok', 'Okay'], ['good', 'Well']].map(function (pair) {
     return /*#__PURE__*/React.createElement("button", {
@@ -1796,28 +1848,27 @@ function CoachCard(props) {
       },
       style: {
         flex: 1,
-        padding: '12px 6px',
-        borderRadius: 10,
+        padding: '9px',
+        borderRadius: 9,
         border: '1px solid rgba(255,255,255,.15)',
-        background: 'rgba(255,255,255,.08)',
+        background: sleep === pair[0] ? 'rgba(255,255,255,.15)' : 'rgba(255,255,255,.07)',
         color: 'rgba(255,255,255,.85)',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 600,
         cursor: 'pointer'
       }
     }, pair[1]);
-  })), /*#__PURE__*/React.createElement("p", {
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color: 'rgba(255,255,255,.2)'
+      marginBottom: 14,
+      minHeight: 52
     }
-  }, "I use this to calibrate today's advice.")), phase === 'loading' && /*#__PURE__*/React.createElement("div", {
+  }, loading ? /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '14px 0',
-      marginBottom: 14
+      padding: '6px 0'
     }
   }, /*#__PURE__*/React.createElement(Spin, {
     size: 14,
@@ -1828,25 +1879,20 @@ function CoachCard(props) {
       color: 'rgba(255,255,255,.35)',
       fontStyle: 'italic'
     }
-  }, "Reading your week, checking conditions", weather && weather.live ? ' (live AQI ' + weather.aqi + ')' : '', "...")), phase === 'brief' && /*#__PURE__*/React.createElement("div", {
+  }, "Coach is reading your week", weather && weather.live ? ' (live AQI ' + weather.aqi + ')' : '', "...")) : chatMode && (reply || asking) ? /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 14
-    }
-  }, chatMode && (reply || asking) ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'rgba(255,255,255,.06)',
+      background: 'rgba(255,255,255,.05)',
       borderRadius: 10,
-      padding: '10px 12px',
-      marginBottom: 12
+      padding: '10px 12px'
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
-      color: 'rgba(255,255,255,.3)',
+      color: 'rgba(255,255,255,.25)',
       fontStyle: 'italic',
       marginBottom: 5
     }
-  }, "\"", msg, "\""), asking ? /*#__PURE__*/React.createElement("div", {
+  }, "You asked..."), asking ? /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -1863,14 +1909,13 @@ function CoachCard(props) {
   }, "Thinking...")) : /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
-      color: 'rgba(255,255,255,.85)',
-      lineHeight: 1.75
+      color: 'rgba(255,255,255,.88)',
+      lineHeight: 1.8
     }
   }, reply), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setChatMode(false);
       setReply('');
-      setMsg('');
     },
     style: {
       background: 'none',
@@ -1881,21 +1926,13 @@ function CoachCard(props) {
       marginTop: 8,
       padding: 0
     }
-  }, "Back to briefing")) : brief ? /*#__PURE__*/React.createElement("p", {
+  }, "Back to briefing")) : /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
-      color: 'rgba(255,255,255,.78)',
-      lineHeight: 1.85,
-      marginBottom: 12
+      color: 'rgba(255,255,255,.85)',
+      lineHeight: 1.85
     }
-  }, brief) : /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,.3)',
-      lineHeight: 1.6,
-      marginBottom: 12
-    }
-  }, "Add your Claude API key in Profile to unlock AI coaching.")), phase === 'brief' && /*#__PURE__*/React.createElement("div", {
+  }, brief)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -1910,11 +1947,11 @@ function CoachCard(props) {
     onKeyDown: function (e) {
       if (e.key === 'Enter') ask();
     },
-    placeholder: brief ? 'Ask a follow-up...' : 'Ask about today\'s run...',
+    placeholder: "Ask your coach...",
     style: {
       flex: 1,
-      background: 'rgba(255,255,255,.08)',
-      border: '1px solid rgba(255,255,255,.12)',
+      background: 'rgba(255,255,255,.07)',
+      border: '1px solid rgba(255,255,255,.1)',
       borderRadius: 10,
       padding: '10px 14px',
       fontSize: 13,
@@ -1924,60 +1961,24 @@ function CoachCard(props) {
     }
   }), /*#__PURE__*/React.createElement("button", {
     onClick: ask,
+    disabled: !msg.trim() || asking,
     style: {
-      width: 40,
-      height: 40,
+      width: 38,
+      height: 38,
       borderRadius: 10,
-      background: msg.trim() ? C.blue : 'rgba(255,255,255,.08)',
+      background: msg.trim() && !asking ? C.blue : 'rgba(255,255,255,.08)',
       border: 'none',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      cursor: 'pointer',
-      opacity: msg.trim() && !asking ? 1 : 0.4
+      cursor: msg.trim() && !asking ? 'pointer' : 'default',
+      flexShrink: 0
     }
   }, asking ? /*#__PURE__*/React.createElement(Spin, {
-    size: 14,
+    size: 13,
     color: "#fff"
-  }) : /*#__PURE__*/React.createElement(IcoSend, null))), phase === 'brief' && sleep && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: 9
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 6,
-      height: 6,
-      borderRadius: '50%',
-      background: {
-        poor: C.red,
-        ok: C.orange,
-        good: C.green
-      }[sleep] || C.t3
-    }
-  }), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 10,
-      color: 'rgba(255,255,255,.2)'
-    }
-  }, "Sleep: ", sleep, " today"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setPhase('sleep');
-    },
-    style: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: 10,
-      color: 'rgba(255,255,255,.18)',
-      marginLeft: 'auto',
-      padding: 0
-    }
-  }, "Change"))));
+  }) : /*#__PURE__*/React.createElement(IcoSend, null)))));
 }
-
 // --- SESSION CARD ---
 function SessionCard(props) {
   var planType = props.planType,
@@ -6593,41 +6594,80 @@ function ProfileScreen(props) {
       cursor: 'pointer',
       textDecoration: 'none',
       textAlign: 'center',
-      marginBottom: 4
+      marginBottom: 8
     }
-  }, "Connect Strava"), /*#__PURE__*/React.createElement("p", {
+  }, "Connect Strava"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10,
-      color: C.t3,
-      textAlign: 'center',
-      marginBottom: 4
+      background: C.card2,
+      borderRadius: 9,
+      padding: '10px 12px'
     }
-  }, "Tapping this will open Strava in your browser to authorise PACER")), stravaConnected && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t2,
+      fontWeight: 600,
+      marginBottom: 3
+    }
+  }, "Before connecting"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.t3,
+      lineHeight: 1.6
+    }
+  }, "Make sure your Strava app's \"Authorization Callback Domain\" is set to your current site URL (e.g. yoursite.netlify.app). Set this at strava.com/settings/api"))), stravaConnected && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.gFg,
       border: '1px solid rgba(22,163,74,.15)',
       borderRadius: 10,
       padding: '12px 14px',
-      marginBottom: 14
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
       color: C.green,
-      fontWeight: 600
+      fontWeight: 600,
+      marginBottom: 2
     }
-  }, "Syncing runs automatically"), /*#__PURE__*/React.createElement("p", {
+  }, "Connected"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11,
-      color: C.t3,
-      marginTop: 2
+      color: C.t3
     }
-  }, "New runs appear in PACER within an hour of finishing. Post-run check-in unlocks on sync.")), /*#__PURE__*/React.createElement("button", {
+  }, "Syncs automatically when you open the app. New runs appear here.")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (toast) toast('Syncing from Strava...');
+      syncStravaActivities().then(function (r) {
+        if (r && r.newRuns && r.newRuns.length > 0) {
+          if (toast) toast(r.newRuns.length + ' new run' + (r.newRuns.length > 1 ? 's' : '') + ' synced!');
+        } else {
+          if (toast) toast('Up to date - no new runs found');
+        }
+      }).catch(function () {
+        if (toast) toast('Sync failed - check connection');
+      });
+    },
+    style: {
+      width: '100%',
+      background: C.navy,
+      color: '#fff',
+      border: 'none',
+      borderRadius: 10,
+      padding: '12px',
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: 'pointer',
+      marginBottom: 10
+    }
+  }, "Sync now"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       sk('pacer_strava_token', '');
       sk('pacer_strava_refresh', '');
       sk('pacer_strava_expiry', '');
+      sk('pacer_last_autosync', '0');
       setStravaConnected(false);
+      if (toast) toast('Strava disconnected');
     },
     style: {
       width: '100%',
@@ -6636,7 +6676,7 @@ function ProfileScreen(props) {
       borderRadius: 10,
       padding: '12px',
       fontSize: 13,
-      color: C.t2,
+      color: C.red,
       cursor: 'pointer'
     }
   }, "Disconnect Strava")), /*#__PURE__*/React.createElement("div", {
@@ -9644,8 +9684,9 @@ function App() {
   }, []);
   useEffect(function () {
     if (screen !== 'app') return;
-    var lastAutoSync = parseInt(gk('pacer_last_autosync') || '0');
-    if (Date.now() - lastAutoSync > 3600000) doStravaSync();
+    // Sync on every app open (if token exists) - not throttled during development
+    var token = gk('pacer_strava_token');
+    if (token) doStravaSync();
   }, [screen]);
   useEffect(function () {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
