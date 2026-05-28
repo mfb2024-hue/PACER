@@ -538,50 +538,199 @@ async function getPostRunAdvice(distKm, feel, sessType, city, weather) {
   var hi = hiCalc(wd.temp, wd.humidity);
   return callClaude('You are PACER. Post-run recovery coach. 2 sentences. Specific Indian foods (curd rice, sattu, coconut water, ORS, banana+milk). One action now, one for tomorrow.', 'Finished ' + distKm + 'km ' + sessType + '. Felt: ' + feel + '. City:' + city + ' heat index ' + hi + 'C.', 130, MODEL_FAST);
 }
+// ── COACHING ENGINE ──
+// Rules based on Jack Daniels, 80/20 Running, Pfitzinger Advanced Marathoning
+// Hard session = tempo, intervals, long run (needs 48hr gap between any two)
+// Long run = 28-32% of weekly volume
+// Quality (tempo/intervals) = 1-2x per week max, never on bad AQI days
+// Recovery: easy or rest the day after any hard session
+// Progressive: don't increase total km >10% from last week
+
+function buildPlanStructure(runnerType,goalKm,forecast,recentRuns,todayIdx){
+  var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var plan=[];
+
+  // AQI verdict for each upcoming day (0=today)
+  var verdicts=[];
+  for(var i=0;i<7;i++){
+    var dayIdx=(todayIdx+i)%7;
+    var fc=forecast[i];
+    verdicts.push(fc?fc.verdict:'GO EASY');
+  }
+
+  // Km targets based on runner level and goal
+  var kmMultiplier={beginner:0.6,casual:0.7,regular:1.0,serious:1.15}[runnerType]||1.0;
+  var total=Math.round(goalKm*kmMultiplier);
+  var longKm=Math.min(Math.round(total*0.30),runnerType==='beginner'?8:runnerType==='regular'?16:20);
+  var tempoKm=Math.min(Math.round(total*0.22),runnerType==='beginner'?5:12);
+  var remaining=total-longKm-tempoKm;
+
+  // Detect recent hard effort (did they do a long run in last 2 days?)
+  var recentHard=false;
+  var yesterday=new Date(Date.now()-86400000).toISOString().split('T')[0];
+  var twoDaysAgo=new Date(Date.now()-2*86400000).toISOString().split('T')[0];
+  if(recentRuns&&recentRuns.length>0){
+    var r0=recentRuns[0];
+    if(r0.date>=twoDaysAgo&&(parseFloat(r0.distKm||0)>=10||r0.type==='long')){recentHard=true;}
+  }
+
+  // Assign session types to each of the 7 days
+  // Strategy: find best days for hard work, protect recovery, fill rest with easy
+  var assigned=Array(7).fill(null);
+  var hardCount=0;
+
+  // Day 0 (today): if recent hard effort, force easy/rest
+  if(recentHard){
+    assigned[0]={type:'easy',km:Math.min(6,Math.round(remaining*0.35)),reason:'recovery'};
+  }
+
+  // Find the best day for long run (good AQI, ideally day 2-5, never day 0 if recent hard)
+  var longDay=-1;
+  var bestScore=-1;
+  for(var d=recentHard?2:1;d<6;d++){
+    var v=verdicts[d];
+    var score=(v==='GO RUN'?3:v==='GO EASY'?2:v==='WAIT'?1:0);
+    // Prefer weekend days (contextual - if Sat/Sun upcoming)
+    var absDay=(todayIdx+d)%7;
+    if(absDay===0||absDay===6)score+=1; // weekend bonus
+    if(score>bestScore){bestScore=score;longDay=d;}
+  }
+  if(longDay>0){
+    assigned[longDay]={type:'long',km:longKm,reason:'cornerstone'};
+    hardCount++;
+    // Day after long = mandatory easy or rest
+    if(longDay+1<7){assigned[longDay+1]={type:'easy',km:Math.min(5,Math.round(remaining*0.25)),reason:'recovery_after_long'};}
+  }
+
+  // Find best day for tempo/quality session (good AQI, 2+ days from long run, not adjacent to hard days)
+  var tempoDay=-1;
+  bestScore=-1;
+  for(var d2=recentHard?1:0;d2<7;d2++){
+    if(assigned[d2])continue;
+    var v2=verdicts[d2];
+    if(v2==='WAIT'||v2==='REST')continue; // never quality on bad AQI
+    var distFromLong=longDay>0?Math.abs(d2-longDay):99;
+    if(distFromLong<2)continue; // need 2 day gap from long
+    if(hardCount>=2)continue; // max 2 hard sessions
+    var score2=(v2==='GO RUN'?3:v2==='GO EASY'?2:1)+(distFromLong>=3?1:0);
+    if(score2>bestScore){bestScore=score2;tempoDay=d2;}
+  }
+  if(tempoDay>=0&&verdicts[tempoDay]!=='WAIT'&&verdicts[tempoDay]!=='REST'){
+    var sessType=runnerType==='beginner'?'easy':runnerType==='serious'?'intervals':'tempo';
+    assigned[tempoDay]={type:sessType,km:tempoKm,reason:'quality'};
+    hardCount++;
+  }
+
+  // Count bad AQI days for rest
+  var badAqiDays=0;
+  for(var d3=0;d3<7;d3++){
+    if(!assigned[d3]&&(verdicts[d3]==='WAIT'||verdicts[d3]==='REST')){
+      badAqiDays++;
+      if(badAqiDays<=2){assigned[d3]={type:'rest',km:0,reason:'aqi_bad'};}
+    }
+  }
+
+  // Ensure at least 2 rest days
+  var restCount=assigned.filter(function(a){return a&&a.type==='rest';}).length;
+  for(var d4=0;d4<7&&restCount<2;d4++){
+    if(!assigned[d4]){assigned[d4]={type:'rest',km:0,reason:'planned_rest'};restCount++;}
+  }
+
+  // Fill remaining days with easy runs, distribute remaining km evenly
+  var easyDays=assigned.filter(function(a){return !a;}).length;
+  var assignedEasyKm=assigned.reduce(function(s,a){return s+(a&&a.type==='easy'?a.km:0);},0);
+  var leftoverKm=Math.max(0,remaining-assignedEasyKm);
+  var kmPerEasy=easyDays>0?Math.round(leftoverKm/easyDays):0;
+  for(var d5=0;d5<7;d5++){
+    if(!assigned[d5]){assigned[d5]={type:'easy',km:Math.max(4,Math.min(kmPerEasy,12)),reason:'easy_fill'};}
+  }
+
+  // Build final plan array with day names
+  for(var i2=0;i2<7;i2++){
+    var dayName=DAYS[(todayIdx+i2)%7];
+    var sess=assigned[i2]||{type:'easy',km:5,reason:'fill'};
+    plan.push({day:dayName,type:sess.type,km:sess.km,_reason:sess.reason,_verdict:verdicts[i2]});
+  }
+
+  return plan;
+}
+
 async function generateAIWeekPlan(userPrefs,recentRuns,weather){
   var goal=userPrefs.goal||'fitness';
   var runnerType=userPrefs.runnerType||'regular';
   var weeklyKm=loadRuns().weeklyKm||0;
   var goalKm=userPrefs.weekGoal||40;
-  var streak=loadRuns().streak||0;
   var city=userPrefs.city||'Bengaluru';
   var wd=weather||getStaticWeather(city);
   var forecast=getWeekForecast(city,7);
-  var todayDay=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
-  var goodDays=forecast.filter(function(d){return d.verdict==='GO RUN'||d.verdict==='GO EASY';}).map(function(d){return d.day;});
-  var badDays=forecast.filter(function(d){return d.verdict==='WAIT'||d.verdict==='REST';}).map(function(d){return d.day;});
-  var recentStr=(recentRuns||[]).slice(0,3).map(function(r){return (r.distKm||r.dist||'?')+'km '+(r.type||'easy');}).join(', ')||'no recent runs';
-  var system='You are a running coach. Return ONLY a raw JSON object. Nothing before or after it. Start with { and end with }.';
-  var prompt='Plan for: '+runnerType+' runner, goal '+goal+', city '+city+', week '+weeklyKm+'/'+goalKm+'km. Good days: '+(goodDays.join(',')||'none')+'. Bad days: '+(badDays.join(',')||'none')+'. Recent: '+recentStr+'. Streak: '+streak+'. Start from '+todayDay+'. 7 days. 2+ rest days. Hard sessions only on good days. Return: {"plan":[{"day":"'+todayDay+'","type":"easy","name":"Easy run","km":8,"why":"base building","tips":"conversational pace"}]}';
+  var todayIdx=new Date().getDay();
+
+  // Build the plan structure using coaching rules first
+  var structure=buildPlanStructure(runnerType,goalKm,forecast,recentRuns,todayIdx);
+
+  // Now use Claude just to add session names, why, and tips (much simpler task = faster + more reliable)
+  var structureStr=structure.map(function(s){
+    return s.day+'|'+s.type+'|'+s.km+'km|AQI:'+s._verdict;
+  }).join(', ');
+
+  var system='You are a running coach. Given a training plan structure, add session names, a 1-sentence reason, and 1 specific tip. Return ONLY raw JSON. No markdown.';
+  var prompt='Runner: '+runnerType+', goal: '+goal+'. Plan structure: '+structureStr+'. Return: {"plan":[{"day":"Thu","type":"easy","name":"Easy aerobic run","km":8,"why":"builds base","tips":"keep conversational pace, 65% max HR"}]}';
+
   try{
-    var text=await callClaude(system,prompt,700,MODEL_FAST);
+    var text=await callClaude(system,prompt,600,MODEL_FAST);
     if(!text||text.length<10)throw new Error('empty');
     var cleaned=text.replace(/```json|```/g,'').trim();
     var jsonStart=cleaned.indexOf('{');
     var jsonEnd=cleaned.lastIndexOf('}');
     if(jsonStart<0||jsonEnd<=jsonStart)throw new Error('no json');
-    cleaned=cleaned.substring(jsonStart,jsonEnd+1);
-    var parsed=JSON.parse(cleaned);
+    var parsed=JSON.parse(cleaned.substring(jsonStart,jsonEnd+1));
     if(parsed&&parsed.plan&&Array.isArray(parsed.plan)&&parsed.plan.length>0){
-      var saved={plan:parsed.plan,city:city,generatedAt:Date.now(),goal:goal};
+      // Merge AI descriptions with our structure (trust our km and type)
+      var merged=structure.map(function(s,i){
+        var ai=parsed.plan[i]||{};
+        return{
+          day:s.day,
+          type:s.type,
+          km:s.km,
+          name:ai.name||(s.type==='rest'?'Rest day':s.type==='long'?'Long run':s.type==='tempo'?'Tempo run':s.type==='intervals'?'Intervals':'Easy run'),
+          why:ai.why||'Structured training session.',
+          tips:ai.tips||'Run at comfortable effort.'
+        };
+      });
+      var saved={plan:merged,city:city,generatedAt:Date.now(),goal:goal};
       saveAIPlan(saved);
       return saved;
     }
-    throw new Error('invalid');
+    throw new Error('invalid json structure');
   }catch(err){
-    console.warn('AI plan error:',err.message);
-    try{
-      var text2=await callClaude('Return ONLY valid JSON, nothing else.','7-day running plan JSON for '+runnerType+' runner goal '+goal+' in '+city+'. Start '+todayDay+'. Format: {"plan":[{"day":"'+todayDay+'","type":"easy","name":"Easy run","km":8,"why":"base building","tips":"conversational pace"}]}',500,MODEL_FAST);
-      if(text2&&text2.length>10){
-        var c2=text2.replace(/```json|```/g,'').trim();
-        var s2=c2.indexOf('{'),e2=c2.lastIndexOf('}');
-        if(s2>=0&&e2>s2){
-          var p2=JSON.parse(c2.substring(s2,e2+1));
-          if(p2&&p2.plan&&p2.plan.length>0){var saved2={plan:p2.plan,city:city,generatedAt:Date.now(),goal:goal};saveAIPlan(saved2);return saved2;}
-        }
-      }
-    }catch(e2){console.warn('Retry failed:',e2.message);}
-    return null;
+    console.warn('AI names failed, using structure only:',err.message);
+    // Fallback: use structure with default names
+    var SESSION_NAMES={
+      easy:'Easy run',long:'Long run',tempo:'Tempo run',
+      intervals:'Intervals',rest:'Rest day',recovery:'Recovery run'
+    };
+    var SESSION_WHY={
+      easy:'Aerobic base building. The foundation of all endurance fitness.',
+      long:'The cornerstone of marathon training. Builds fat-burning capacity and mental toughness.',
+      tempo:'Pushes your lactate threshold. This is the session that makes you race faster.',
+      intervals:'VO2max development. Short, controlled hard efforts with full recovery between.',
+      rest:'Adaptation happens during rest, not during runs. This is non-negotiable.',
+      recovery:'Active recovery. Flush the legs, stay loose, do not push the pace.'
+    };
+    var SESSION_TIPS={
+      easy:'You should be able to hold a full conversation. If you cant, slow down.',
+      long:'Start 30-45 seconds per km slower than your easy pace. Walk breaks are fine.',
+      tempo:'Should feel comfortably hard -- 7 out of 10 effort. Steady, not sprinting.',
+      intervals:'Full recovery between reps. Each rep should feel the same effort as the first.',
+      rest:'Hydrate, sleep, eat well. Your body is rebuilding right now.',
+      recovery:'Heart rate under 140. This is meant to be boring. Thats the point.'
+    };
+    var fallback=structure.map(function(s){
+      return{day:s.day,type:s.type,km:s.km,name:SESSION_NAMES[s.type]||'Easy run',why:SESSION_WHY[s.type]||'Training session.',tips:SESSION_TIPS[s.type]||'Run at comfortable effort.'};
+    });
+    var saved2={plan:fallback,city:city,generatedAt:Date.now(),goal:goal};
+    saveAIPlan(saved2);
+    return saved2;
   }
 }
 
