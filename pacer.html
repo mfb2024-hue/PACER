@@ -1198,8 +1198,8 @@ function Sheet(props) {
 // --- NAV ICONS ---
 function NavHome(a) {
   return /*#__PURE__*/React.createElement("svg", {
-    width: "22",
-    height: "22",
+    width: "26",
+    height: "26",
     viewBox: "0 0 24 24",
     fill: a ? C.navy : 'none',
     stroke: a ? C.navy : C.t3,
@@ -1214,8 +1214,8 @@ function NavHome(a) {
 }
 function NavClubs(a) {
   return /*#__PURE__*/React.createElement("svg", {
-    width: "22",
-    height: "22",
+    width: "26",
+    height: "26",
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: a ? C.navy : C.t3,
@@ -1235,8 +1235,8 @@ function NavClubs(a) {
 }
 function NavTrain(a) {
   return /*#__PURE__*/React.createElement("svg", {
-    width: "22",
-    height: "22",
+    width: "26",
+    height: "26",
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: a ? C.navy : C.t3,
@@ -1248,8 +1248,8 @@ function NavTrain(a) {
 }
 function NavManage(a) {
   return /*#__PURE__*/React.createElement("svg", {
-    width: "22",
-    height: "22",
+    width: "26",
+    height: "26",
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: a ? C.navy : C.t3,
@@ -1274,8 +1274,8 @@ function NavManage(a) {
 }
 function NavProfile(a) {
   return /*#__PURE__*/React.createElement("svg", {
-    width: "22",
-    height: "22",
+    width: "26",
+    height: "26",
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: a ? C.navy : C.t3,
@@ -2834,7 +2834,8 @@ function HomeScreen(props) {
     weeklyKm: weeklyKm,
     goalKm: goalKm,
     streak: streak,
-    weather: liveWeather
+    weather: liveWeather,
+    runMode: userPrefs.runMode || 'training'
   }), /*#__PURE__*/React.createElement(SessionCard, {
     planType: planType,
     city: city,
@@ -9542,7 +9543,7 @@ function NavBar(props) {
       }
     }), t.Ic(active), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 600,
         color: active ? C.navy : C.t3
       }
@@ -9765,7 +9766,7 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      height: 60
+      height: 68
     }
   }, /*#__PURE__*/React.createElement(NavBar, {
     nav: nav,
