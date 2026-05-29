@@ -640,7 +640,7 @@ async function fetchLiveWeather(city) {
 
   // Try Netlify function first (proxies Open-Meteo, better caching)
   try {
-    var fr = await fetch('/.netlify/functions/weather?city=' + encodeURIComponent(city));
+    var fr = await fetch('/api/weather?city=' + encodeURIComponent(city));
     if (fr.ok) {
       var d = await fr.json();
       if (d.aqi !== undefined) {
@@ -710,7 +710,7 @@ async function callClaude(system, user, maxTok, model) {
   // == Cache miss: call Claude ==
   var answer = '';
   try {
-    var fr = await fetch('/.netlify/functions/coach', {
+    var fr = await fetch('/api/coach', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({system:system, user:user, max_tokens:maxTok||200, model:mdl})
@@ -880,46 +880,365 @@ function getQualityType(phase, goalType) {
 // -- NEW buildPlanStructure (replaces old one) ------------------
 
 
+
+//    GOAL PROFILES                                                          
+// Every goal type gets its own structural blueprint.
+// All distances in km. Paces calculated dynamically from VDOT.
+var GOAL_PROFILES = {
+
+  //    SPEED GOALS (5k / 10k)                                               
+  '5k_finish': {
+    label:'Complete a 5k',
+    distKm:5, minWeeks:6, maxWeeks:10,
+    peakLongKm:12, weeklyKmCap:45,
+    phaseSplit:{base:0.30,build:0.45,peak:0.20,taper:0.05},
+    qualityFocus:'intervals', // 5k = speed dominant
+    longPct:0.22, qualityPct:0.18,
+    minRunDays:3, maxRunDays:4,
+    minStartKm:12
+  },
+  '5k_sub30': {
+    label:'Sub-30 min 5k',
+    distKm:5, minWeeks:6, maxWeeks:10,
+    peakLongKm:14, weeklyKmCap:50,
+    phaseSplit:{base:0.25,build:0.45,peak:0.25,taper:0.05},
+    qualityFocus:'intervals',
+    longPct:0.22, qualityPct:0.20,
+    minRunDays:3, maxRunDays:4,
+    minStartKm:15
+  },
+  '5k_sub25': {
+    label:'Sub-25 min 5k',
+    distKm:5, minWeeks:8, maxWeeks:12,
+    peakLongKm:16, weeklyKmCap:55,
+    phaseSplit:{base:0.25,build:0.40,peak:0.30,taper:0.05},
+    qualityFocus:'intervals',
+    longPct:0.22, qualityPct:0.22,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:18
+  },
+  '5k_sub20': {
+    label:'Sub-20 min 5k',
+    distKm:5, minWeeks:10, maxWeeks:16,
+    peakLongKm:18, weeklyKmCap:65,
+    phaseSplit:{base:0.20,build:0.40,peak:0.35,taper:0.05},
+    qualityFocus:'intervals',
+    longPct:0.20, qualityPct:0.24,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:20
+  },
+  '10k_finish': {
+    label:'Complete a 10k',
+    distKm:10, minWeeks:8, maxWeeks:12,
+    peakLongKm:14, weeklyKmCap:50,
+    phaseSplit:{base:0.33,build:0.42,peak:0.20,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.26, qualityPct:0.18,
+    minRunDays:3, maxRunDays:4,
+    minStartKm:15
+  },
+  '10k_sub60': {
+    label:'Sub-60 min 10k',
+    distKm:10, minWeeks:8, maxWeeks:12,
+    peakLongKm:16, weeklyKmCap:55,
+    phaseSplit:{base:0.30,build:0.42,peak:0.23,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.26, qualityPct:0.20,
+    minRunDays:3, maxRunDays:5,
+    minStartKm:18
+  },
+  '10k_sub50': {
+    label:'Sub-50 min 10k',
+    distKm:10, minWeeks:10, maxWeeks:14,
+    peakLongKm:18, weeklyKmCap:60,
+    phaseSplit:{base:0.28,build:0.42,peak:0.25,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.26, qualityPct:0.22,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:20
+  },
+  '10k_sub40': {
+    label:'Sub-40 min 10k',
+    distKm:10, minWeeks:12, maxWeeks:16,
+    peakLongKm:20, weeklyKmCap:70,
+    phaseSplit:{base:0.25,build:0.40,peak:0.30,taper:0.05},
+    qualityFocus:'intervals',
+    longPct:0.24, qualityPct:0.24,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:25
+  },
+
+  //    HALF MARATHON                                                         
+  'half_finish': {
+    label:'Finish half marathon',
+    distKm:21.1, minWeeks:10, maxWeeks:16,
+    peakLongKm:19, weeklyKmCap:65,
+    phaseSplit:{base:0.35,build:0.40,peak:0.20,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.28, qualityPct:0.16,
+    minRunDays:3, maxRunDays:5,
+    minStartKm:22
+  },
+  'half_sub2': {
+    label:'Sub-2 hour half marathon',
+    distKm:21.1, minWeeks:12, maxWeeks:16,
+    peakLongKm:21, weeklyKmCap:70,
+    phaseSplit:{base:0.30,build:0.42,peak:0.23,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.28, qualityPct:0.18,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:25
+  },
+  'half_sub130': {
+    label:'Sub-1:30 half marathon',
+    distKm:21.1, minWeeks:14, maxWeeks:20,
+    peakLongKm:22, weeklyKmCap:80,
+    phaseSplit:{base:0.28,build:0.40,peak:0.27,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.27, qualityPct:0.20,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:30
+  },
+
+  //    FULL MARATHON                                                         
+  'marathon_finish': {
+    label:'Finish a marathon',
+    distKm:42.2, minWeeks:16, maxWeeks:20,
+    peakLongKm:32, weeklyKmCap:80,
+    phaseSplit:{base:0.35,build:0.38,peak:0.22,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.32, qualityPct:0.14,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:28
+  },
+  'marathon_sub4': {
+    label:'Sub-4 hour marathon',
+    distKm:42.2, minWeeks:16, maxWeeks:20,
+    peakLongKm:34, weeklyKmCap:85,
+    phaseSplit:{base:0.33,build:0.38,peak:0.24,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.32, qualityPct:0.16,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:32
+  },
+  'marathon_sub330': {
+    label:'Sub-3:30 marathon',
+    distKm:42.2, minWeeks:18, maxWeeks:24,
+    peakLongKm:35, weeklyKmCap:95,
+    phaseSplit:{base:0.30,build:0.38,peak:0.27,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.31, qualityPct:0.18,
+    minRunDays:5, maxRunDays:6,
+    minStartKm:40
+  },
+
+  //    ULTRA                                                                 
+  'ultra_50k': {
+    label:'Complete 50k ultra',
+    distKm:50, minWeeks:18, maxWeeks:24,
+    peakLongKm:40, weeklyKmCap:100,
+    phaseSplit:{base:0.42,build:0.35,peak:0.18,taper:0.05},
+    qualityFocus:'tempo', // ultras = tempo not intervals
+    longPct:0.38, qualityPct:0.12,
+    minRunDays:4, maxRunDays:5,
+    minStartKm:35
+  },
+  'ultra_100k': {
+    label:'Complete 100k ultra',
+    distKm:100, minWeeks:24, maxWeeks:32,
+    peakLongKm:55, weeklyKmCap:120,
+    phaseSplit:{base:0.45,build:0.33,peak:0.17,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.40, qualityPct:0.10,
+    minRunDays:4, maxRunDays:6,
+    minStartKm:45
+  },
+
+  //    INDIA SPECIFIC                                                        
+  'army_fitness': {
+    label:'Army / NDA fitness test',
+    distKm:1.6, minWeeks:6, maxWeeks:12,
+    peakLongKm:10, weeklyKmCap:45,
+    phaseSplit:{base:0.25,build:0.40,peak:0.30,taper:0.05},
+    qualityFocus:'intervals', // pure speed
+    longPct:0.18, qualityPct:0.28,
+    minRunDays:4, maxRunDays:6,
+    minStartKm:15
+  },
+
+  //    GENERAL / FALLBACK                                                    
+  'general': {
+    label:'Run consistently',
+    distKm:0, minWeeks:6, maxWeeks:12,
+    peakLongKm:16, weeklyKmCap:55,
+    phaseSplit:{base:0.40,build:0.40,peak:0.15,taper:0.05},
+    qualityFocus:'tempo',
+    longPct:0.25, qualityPct:0.15,
+    minRunDays:3, maxRunDays:4,
+    minStartKm:15
+  },
+  'beginner': {
+    label:'Start running',
+    distKm:0, minWeeks:8, maxWeeks:12,
+    peakLongKm:12, weeklyKmCap:35,
+    phaseSplit:{base:0.50,build:0.35,peak:0.10,taper:0.05},
+    qualityFocus:'none',
+    longPct:0.22, qualityPct:0,
+    minRunDays:3, maxRunDays:3,
+    minStartKm:10
+  }
+};
+
+// Map parsed goal to a GOAL_PROFILES key
+function resolveGoalProfile(parsedGoal, runnerType) {
+  if(!parsedGoal) return runnerType==='beginner'?'beginner':'general';
+  var gt = parsedGoal.goal_type||'general';
+  var dist = parsedGoal.target_distance_km||0;
+  var timeMins = parsedGoal.target_time_minutes||0;
+  var text = (parsedGoal.goal_plain||'').toLowerCase();
+
+  // Army / NDA fitness
+  if(text.includes('nda')||text.includes('army')||text.includes('military')||
+     text.includes('upsc')||text.includes('defence')||text.includes('1600')) return 'army_fitness';
+
+  // Ultra
+  if(dist>=80||text.includes('100k')||text.includes('100 k')) return 'ultra_100k';
+  if(dist>=45||text.includes('50k')||text.includes('ultra')||text.includes('comrades')) return 'ultra_50k';
+
+  // Marathon
+  if(dist>=38||text.includes('marathon')&&!text.includes('half')) {
+    if(timeMins>0&&timeMins<=210) return 'marathon_sub330';
+    if(timeMins>0&&timeMins<=240) return 'marathon_sub4';
+    return 'marathon_finish';
+  }
+
+  // Half marathon
+  if(dist>=18||text.includes('half')||text.includes('21k')||text.includes('21.1')) {
+    if(timeMins>0&&timeMins<=90) return 'half_sub130';
+    if(timeMins>0&&timeMins<=120) return 'half_sub2';
+    return 'half_finish';
+  }
+
+  // 10k
+  if(dist>=8||text.includes('10k')||text.includes('10 k')) {
+    if(timeMins>0&&timeMins<=40) return '10k_sub40';
+    if(timeMins>0&&timeMins<=50) return '10k_sub50';
+    if(timeMins>0&&timeMins<=60) return '10k_sub60';
+    return '10k_finish';
+  }
+
+  // 5k
+  if(dist>=3||text.includes('5k')||text.includes('5 k')||text.includes('parkrun')) {
+    if(timeMins>0&&timeMins<=20) return '5k_sub20';
+    if(timeMins>0&&timeMins<=25) return '5k_sub25';
+    if(timeMins>0&&timeMins<=30) return '5k_sub30';
+    return '5k_finish';
+  }
+
+  if(runnerType==='beginner') return 'beginner';
+  return 'general';
+}
+
+
 function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, params) {
   var p = params||{};
   var vdot = p.vdot || estimateCurrentVDOT(recentRuns) || 35;
   var paces = getTrainingPaces(vdot);
   var weekNum = p.weekNumber||1;
-  var totalWeeks = p.totalWeeks||8;
-  var phases = getPhaseDurations(totalWeeks);
-  var phase = getPhase(weekNum, phases);
-  var goalType = p.goalObj&&p.goalObj.goal_type||'general';
+  var totalWeeks = p.totalWeeks||12;
+  var goalObj = p.goalObj||null;
   var tier = getUserTier(runnerType);
   var wd = getStaticWeather('Bengaluru');
   var hi2 = p.heatIndex||hiCalc(wd.temp,wd.humidity);
   var aqi2 = p.aqi||wd.aqi||80;
 
-  // Goal-based weekly volume minimums
-  var goalMin = (goalType==='race'||goalType==='marathon'||goalKm>=40)?28:
-                goalType==='half'?22:
-                (goalType==='5k'||goalType==='pace'||goalType==='fitness_test')?18:
-                (tier==='tier_1'||runnerType==='beginner')?12:15;
-  var weeklyKm = loadRuns().weeklyKm||0;
-  if(!weeklyKm) weeklyKm = goalMin;
+  //    Resolve goal profile                                                 
+  var profileKey = resolveGoalProfile(goalObj, runnerType);
+  var profile = GOAL_PROFILES[profileKey]||GOAL_PROFILES.general;
 
-  // Every 4th week = deload
+  //    Total weeks from goal (parsed weeks_available takes priority)        
+  if(goalObj&&goalObj.weeks_available&&goalObj.weeks_available>0) {
+    totalWeeks = Math.min(Math.max(goalObj.weeks_available, profile.minWeeks), profile.maxWeeks);
+  }
+
+  //    Phase split from profile                                             
+  var phases = {
+    base:  Math.round(totalWeeks * profile.phaseSplit.base),
+    build: Math.round(totalWeeks * profile.phaseSplit.build),
+    peak:  Math.round(totalWeeks * profile.phaseSplit.peak),
+    taper: Math.max(1, Math.round(totalWeeks * profile.phaseSplit.taper))
+  };
+  var phase = getPhase(weekNum, phases);
+
+  //    Starting weekly volume from Strava history                           
+  // Use the runner's ACTUAL recent average, not just the floor
+  var stravaWeeklyAvg = 0;
+  if(recentRuns&&recentRuns.length>=4) {
+    var now = Date.now();
+    var eightWeeksAgo = now - 56*86400000;
+    var recentEnough = recentRuns.filter(function(r){
+      return r.date && new Date(r.date+'T12:00:00').getTime() > eightWeeksAgo;
+    });
+    if(recentEnough.length>=3) {
+      var totalKm = recentEnough.reduce(function(a,r){ return a+(parseFloat(r.distKm)||0); }, 0);
+      // Average over 8 weeks, not just weeks with runs
+      stravaWeeklyAvg = Math.round(totalKm/8);
+    }
+  }
+
+  var baseWeeklyKm = Math.max(
+    profile.minStartKm,
+    stravaWeeklyAvg > 0 ? stravaWeeklyAvg : (loadRuns().weeklyKm||profile.minStartKm)
+  );
+
+  //    Target weekly km for this week                                      
   var isRecoveryWeek = weekNum%4===0;
-  var targetKm = isRecoveryWeek ? Math.round(weeklyKm*0.72) : Math.round(weeklyKm*1.08);
+  var weekFraction = weekNum/totalWeeks;
+  var peakKm = Math.min(profile.weeklyKmCap, Math.max(baseWeeklyKm*1.8, profile.minStartKm*1.6));
+
+  // Progressive build using sinusoidal curve (smooth ramp, not linear)
+  var rawTarget = baseWeeklyKm + (peakKm-baseWeeklyKm)*(1-Math.cos(Math.PI*weekFraction))/2;
   if(phase==='TAPER') {
     var taperW = weekNum-(phases.base+phases.build+phases.peak);
-    targetKm = Math.round(weeklyKm*(1-taperW*0.22));
+    rawTarget = peakKm*(1-taperW*0.25);
   }
-  targetKm = Math.max(goalMin, Math.min(80, targetKm));
+  var targetKm = Math.round(isRecoveryWeek ? rawTarget*0.72 : rawTarget);
+  targetKm = Math.max(profile.minStartKm, Math.min(profile.weeklyKmCap, targetKm));
 
-  // Adjust paces for conditions
+  //    Weather-adjusted paces                                               
   var adjE = adjustPaceForConditions(paces.E, hi2, aqi2);
   var adjT = adjustPaceForConditions(paces.T, hi2, aqi2);
   var adjI = adjustPaceForConditions(paces.I, hi2, aqi2);
 
-  // Max running days by tier
-  var maxRunDays = tier==='tier_1'?3:tier==='tier_2'?4:5;
+  //    Max running days by tier AND profile                                
+  var maxRunDays = Math.min(
+    tier==='tier_1'?3:tier==='tier_2'?4:5,
+    profile.maxRunDays
+  );
+  var minRunDays = profile.minRunDays||3;
 
-  // Align forecast to day names
+  //    Long run distance from profile                                      
+  var peakLongKm = profile.peakLongKm;
+  var longKm = Math.round(peakLongKm * (0.6 + 0.4*(weekFraction)));
+  if(phase==='BASE')  longKm = Math.round(targetKm * 0.25);
+  if(phase==='TAPER') longKm = Math.round(peakLongKm * 0.65);
+  longKm = Math.max(6, Math.min(peakLongKm, longKm));
+
+  //    Quality sessions by profile focus                                   
+  var qualCount = 0;
+  var qualType = profile.qualityFocus||'tempo';
+  if(qualType==='none'||tier==='tier_1') { qualCount=0; }
+  else if(phase==='BASE') { qualCount=0; }
+  else if(phase==='BUILD') { qualCount=targetKm>=25?1:0; }
+  else if(phase==='PEAK')  { qualCount=targetKm>=28?2:1; }
+  else if(phase==='TAPER') { qualCount=1; }
+  if(isRecoveryWeek&&qualCount>1) qualCount=1;
+  // 5k profiles override: more intervals in PEAK
+  if((profileKey==='5k_sub20'||profileKey==='5k_sub25')&&phase==='PEAK') qualType='intervals';
+
+  var qualKm = qualCount>0?Math.round(targetKm*profile.qualityPct/qualCount):0;
+
+  //    Day assignment                                                       
   var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   var forecastByDay={};
   if(forecast) forecast.forEach(function(f){ forecastByDay[f.day]=f.verdict||'GO RUN'; });
@@ -928,32 +1247,19 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
     return (v==='WAIT'||v==='REST')?i:-1;
   }).filter(function(i){ return i>=0; });
 
-  // STEP 1: Long run day (Sat=5, else Sun=6, else Fri=4)
+  // Long run: Saturday by default, avoid bad AQI
   var longRunDay=5;
   if(badDays.includes(5)) longRunDay=6;
   if(badDays.includes(5)&&badDays.includes(6)) longRunDay=4;
-  var longKm=Math.round(targetKm*0.29);
 
-  // STEP 2: Recovery jog = day after long run
   var recoveryDay=(longRunDay+1)%7;
 
-  // STEP 3: Quality session (only in BUILD/PEAK, never BASE)
-  var qualCount=0;
-  if(phase==='BUILD') qualCount=targetKm>=25?1:0;
-  else if(phase==='PEAK') qualCount=targetKm>=28?2:1;
-  else if(phase==='TAPER') qualCount=1;
-  if(tier==='tier_1') qualCount=0; // tier_1 never gets quality
-  if(isRecoveryWeek&&qualCount>1) qualCount=1;
-
-  var qualType=phase==='PEAK'?'intervals':'tempo';
-  var qualKm=qualCount>0?Math.round(targetKm*0.18/qualCount):0;
-
-  // Pick quality days: not long/recovery, not bad AQI, >=2 days from long, >=2 from each other
+  // Quality days: away from long, not on bad AQI days
   var qualDays=[];
   if(qualCount>0){
     var candidates=DAYS.map(function(_,i){ return i; }).filter(function(i){
       return !badDays.includes(i)&&i!==longRunDay&&i!==recoveryDay&&
-             Math.abs(i-longRunDay)>=2&&Math.abs(i-recoveryDay)>=1;
+             Math.abs(i-longRunDay)>=2;
     });
     candidates.forEach(function(d){
       if(qualDays.length>=qualCount) return;
@@ -962,12 +1268,7 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
     });
   }
 
-  // STEP 4: Fill easy runs up to maxRunDays
-  var assignedDays=[longRunDay,recoveryDay].concat(qualDays);
-  var easyRunDays=[];
-  var easyKm=Math.max(5,Math.round((targetKm-longKm-Math.round(longKm*0.4)-qualKm*qualDays.length)/Math.max(1,maxRunDays-assignedDays.length)));
-  
-  // Rotating easy run names by phase
+  // Easy run names by phase
   var easyNames={
     BASE:['Aerobic base run','Foundation run'],
     BUILD:['Easy run with strides','Easy aerobic','Easy aerobic'],
@@ -976,23 +1277,25 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
   };
   var namePool=easyNames[phase]||easyNames.BASE;
   var easyNameIdx=0;
+  var assignedDays=[longRunDay,recoveryDay].concat(qualDays);
+  var easyRunDays=[];
+  var totalRunKm=longKm+Math.round(longKm*0.45)+qualKm*qualDays.length;
+  var easyKm=Math.max(5,Math.round((targetKm-totalRunKm)/Math.max(1,maxRunDays-assignedDays.length)));
 
-  var allRunCandidates=DAYS.map(function(_,i){return i;}).filter(function(i){
+  var allCandidates=DAYS.map(function(_,i){return i;}).filter(function(i){
     return !assignedDays.includes(i)&&!badDays.includes(i);
   });
-
-  allRunCandidates.forEach(function(d){
+  allCandidates.forEach(function(d){
     if(assignedDays.length>=maxRunDays) return;
     assignedDays.push(d);
     easyRunDays.push(d);
   });
 
-  // STEP 5: Check for 3+ consecutive running days and break them up
+  // No 3 consecutive running days
   var runSet=new Set(assignedDays);
   DAYS.forEach(function(_,i){
     var prev=(i-1+7)%7, next=(i+1)%7;
     if(runSet.has(i)&&runSet.has(prev)&&runSet.has(next)){
-      // i is the middle of 3 consecutive   convert to rest unless it's long/quality
       if(!qualDays.includes(i)&&i!==longRunDay&&i!==recoveryDay){
         runSet.delete(i);
         easyRunDays=easyRunDays.filter(function(d){ return d!==i; });
@@ -1000,19 +1303,33 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
     }
   });
 
+  // Ensure minimum 2 rest days
+  var restCount=DAYS.filter(function(d){ return !runSet.has(DAYS.indexOf(d)); }).length;
+  if(restCount<2){
+    var extras=easyRunDays.filter(function(d){
+      return !qualDays.includes(d)&&d!==longRunDay&&d!==recoveryDay;
+    });
+    if(extras.length>0){
+      var makeRest=extras[Math.floor(extras.length/2)];
+      runSet.delete(makeRest);
+      easyRunDays=easyRunDays.filter(function(d){ return d!==makeRest; });
+    }
+  }
+
   // Build schedule
   var schedule={};
   DAYS.forEach(function(day,i){
     if(i===longRunDay){
-      schedule[day]={type:'long',name:'Long run',km:phase==='TAPER'?Math.round(longKm*0.7):longKm,zone:'E',pace:adjE,pacePlain:fmtPaceSec(adjE)};
+      schedule[day]={type:'long',name:'Long run',km:phase==='TAPER'?Math.round(longKm*0.65):longKm,
+        zone:'E',pace:adjE,pacePlain:fmtPaceSec(adjE)};
     } else if(i===recoveryDay&&runSet.has(i)){
-      var recKm=Math.max(4,Math.round(longKm*0.4));
-      schedule[day]={type:'recovery',name:'Recovery jog',km:recKm,zone:'E',pace:adjE+60,pacePlain:fmtPaceSec(adjE+60)};
+      var recKm=Math.max(4,Math.round(longKm*0.45));
+      schedule[day]={type:'recovery',name:'Recovery jog',km:recKm,zone:'E',
+        pace:adjE+60,pacePlain:fmtPaceSec(adjE+60)};
     } else if(qualDays.includes(i)){
-      var qLabel=qualType==='tempo'?'Tempo run':'Intervals';
+      var qLabel=qualType==='intervals'?'Intervals':'Tempo run';
       var qz=qualType==='intervals'?'I':'T';
       var qPace=qualType==='intervals'?adjI:adjT;
-      // Deload: cut km by 40% on recovery week
       var qKmFinal=isRecoveryWeek?Math.round(qualKm*0.6):qualKm;
       schedule[day]={type:qualType,name:qLabel,km:qKmFinal,zone:qz,pace:qPace,pacePlain:fmtPaceSec(qPace)};
     } else if(runSet.has(i)&&easyRunDays.includes(i)){
@@ -1023,34 +1340,21 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
     }
   });
 
-  // Guarantee minimum 2 rest days
-  var restCount=DAYS.filter(function(d){ return schedule[d].type==='rest'; }).length;
-  if(restCount<2){
-    // Convert easiest easy run to rest (prefer mid-week non-adjacent to quality)
-    var extras=easyRunDays.filter(function(d){
-      return !qualDays.includes(d)&&d!==longRunDay&&d!==recoveryDay;
-    });
-    if(extras.length>0){
-      var makeRest=extras[Math.floor(extras.length/2)];
-      schedule[DAYS[makeRest]]={type:'rest',name:'Rest day',km:0};
-    }
-  }
-
   return {
     phase:phase, weekNumber:weekNum, totalWeeks:totalWeeks,
     targetWeeklyKm:targetKm, isRecoveryWeek:isRecoveryWeek,
     qualitySessions:qualCount, schedule:schedule,
-    paces:paces, vdot:vdot,
+    paces:paces, vdot:vdot, profileKey:profileKey,
+    profileLabel:profile.label,
+    stravaSeeded:stravaWeeklyAvg>0,
+    baseWeeklyKm:baseWeeklyKm,
+    peakLongKm:peakLongKm,
     heatPenalty:thermalCalc(hi2,60), aqi:aqi2,
     phaseDesc:getPhaseDesc(phase)
   };
 }
 
 
-
-//    applyWeatherToSchedule                                                 
-// Call after buildPlanStructure. Adjusts today's and future sessions
-// based on actual forecast. Returns { schedule, swapNotes }.
 function applyWeatherToSchedule(schedule, forecast, city) {
   if(!schedule||!forecast||!forecast.length) return {schedule:schedule, swapNotes:[]};
 
@@ -1092,8 +1396,8 @@ function applyWeatherToSchedule(schedule, forecast, city) {
       sched[swapDay]=qualSess;
       sched[todayName]={type:'easy',name:'Easy aerobic',km:sched[todayName].km||6,zone:'E',
         pace:sched[todayName].pace,pacePlain:sched[todayName].pacePlain};
-      swapNotes.push(todaySess.name+' moved to '+swapDay+' -- AQI '+todayFc.aqi+
-        ' and heat index '+todayFc.hi+'C today. '+swapDay+"'s forecast looks better.");
+      var aqi_context = todayFc.aqi>150?' AQI '+todayFc.aqi+' causes real respiratory stress during hard efforts.':' AQI '+todayFc.aqi+' -- not ideal for quality work.';
+      swapNotes.push(todaySess.name+' moved to '+swapDay+'.'+aqi_context+' Heat index '+todayFc.hi+'C today. '+swapDay+" conditions are better -- quality session moved there to protect your training stimulus.");
     }
   }
 
@@ -1114,8 +1418,7 @@ function applyWeatherToSchedule(schedule, forecast, city) {
     if(swapDayB){
       sched[swapDayB]=Object.assign({},todaySess2);
       sched[todayName]={type:'rest',name:'Rest day',km:0};
-      swapNotes.push('Long run moved to '+swapDayB+' -- heat index '+todayFc.hi+
-        'C makes long efforts unsafe today. Extra heat stress accumulates over distance.');
+      swapNotes.push('Long run moved to '+swapDayB+'. Heat index '+todayFc.hi+'C today -- long efforts above 38C heat index cause compounding fatigue that takes 48h+ to recover from. '+swapDayB+' forecast is cooler.');
     }
   }
 
@@ -1178,7 +1481,10 @@ async function generateWeeklyPlan(planStruct, userPrefs, recentRuns) {
 
   var system = 'You are PACER training coach for Indian runners. The training structure has been scientifically calculated using VDOT and Daniels methodology. Your ONLY job is to write the human language that explains each session. Do NOT change any session type, distance, or pace. Plain English. No emojis. No markdown.';
 
-  var prompt = 'Runner: '+name+' ('+tier+'). Goal: '+(userPrefs.goal||'fitness')+'. VDOT: '+Math.round(vdot)+'. Easy pace: '+fmtPaceSec(paces.E)+'. Last 3 runs: '+lastRuns+'.\n\nWeek '+weekNumber+' of '+totalWeeks+' -- '+phase+' PHASE'+(isRecoveryWeek?' (Recovery week)':'')+'. Target: '+targetWeeklyKm+'km. Heat penalty: +'+heatPenalty+'s/km.\n\nSESSIONS (structure is fixed):\n'+sessLines+'\n\nFor each non-rest session write exactly:\nName: [session name appropriate for '+tier+']\nWhy: [one sentence -- why this session this week]\nTip: [one specific practical instruction]\n\nFor REST: one sentence only on why rest is here.\nFor recovery jog: stress how slow -- "embarrassingly slow" is correct.\n\nLanguage rules: tier_1 uses time not km, no jargon. tier_2 plain English science. tier_3 technical terms fine, treat as athlete. Never say: make sure, ensure, optimal, it is important to. Never repeat the same tip twice.';
+  var profileLabel = planStruct.profileLabel||'fitness';
+  var stravaNote = planStruct.stravaSeeded?('Strava history used: starting from '+planStruct.baseWeeklyKm+'km/week base.'):'No Strava history -- starting from estimated base.';
+  var weatherNote = heatPenalty>0?('Heat index is high this week -- all paces adjusted +'+heatPenalty+'s/km. Outdoor running in Bengaluru heat requires extra hydration and pace discipline.'):'Weather is manageable this week.';
+  var prompt = 'Runner: '+name+' ('+tier+'). Goal: '+profileLabel+'. VDOT: '+Math.round(vdot)+'. Easy pace: '+fmtPaceSec(paces.E)+'/km. Last 3 runs: '+lastRuns+'.\n'+stravaNote+'\n\nWeek '+weekNumber+' of '+totalWeeks+' -- '+phase+' PHASE'+(isRecoveryWeek?' (RECOVERY week -- 28% volume reduction)':'')+'. Target: '+targetWeeklyKm+'km. Peak long run target: '+(planStruct.peakLongKm||'--')+'km.\n\n'+weatherNote+'\n\nSESSIONS (structure is fixed -- do not change distances or types):\n'+sessLines+'\n\nFor each non-rest session write exactly:\nName: [specific session name appropriate for '+tier+' targeting '+profileLabel+']\nWhy: [one sentence -- why this exact session serves the '+profileLabel+' goal this week in '+phase+' phase]\nTip: [one specific practical instruction for Indian conditions]\n\nFor REST: one sentence on why rest matters at this point in the plan.\nFor recovery jog: must say how slow -- slower than a brisk walk feels is correct.\n\nLanguage rules: tier_1 uses time not km, no technical jargon. tier_2 plain English science. tier_3 treat as trained athlete. Never say: make sure, ensure, optimal, it is important to. Never repeat same tip twice.';
 
   var resp = await callClaude(system, prompt, 600, MODEL_FAST);
   return resp||'';
@@ -1215,7 +1521,7 @@ function adaptPlanForNextWeek(completedSessions, perceivedEfforts, missedCount) 
 
 async function parseUserGoal(goalText, currentVDOT, weeksAvailable) {
   var system = 'You parse running goals into JSON. Return only valid JSON, no explanation, no markdown.';
-  var prompt = 'Parse this running goal. Return this exact JSON structure with no other text:\n{"goal_type":"race|pace|fitness_test|structured_rounds|general|health","target_distance_km":null,"target_pace_sec_per_km":null,"target_time_minutes":null,"event_name":null,"weeks_available":null,"goal_plain":"one sentence summary","requires_vdot":false}\n\nGoal: "'+goalText+'"\nCurrent VDOT: '+(currentVDOT||'unknown')+'\nWeeks available: '+(weeksAvailable||'unknown')+'\n\nFor target_pace_sec_per_km: 7:00/km=420, 6:30/km=390, 5:00/km=300\ngoal_type examples: run Mumbai Marathon=race, 7min per km 10K=pace, NDA 1600m=fitness_test, 8x1km=structured_rounds, run more=general, weight loss=health';
+  var prompt = 'Parse this running goal for an Indian runner. Return only valid JSON:\n{"goal_type":"race|pace|fitness_test|general|beginner|health","target_distance_km":null,"target_pace_sec_per_km":null,"target_time_minutes":null,"event_name":null,"weeks_available":null,"goal_plain":"one sentence plain English summary of their goal","requires_vdot":false}\n\nGoal: "'+goalText+'"\nCurrent VDOT: '+(currentVDOT||'unknown')+'\nWeeks available: '+(weeksAvailable||'unknown')+'\n\nRules:\n- target_distance_km: 5k=5, 10k=10, half marathon=21.1, marathon=42.2, 50k=50, 100k=100, NDA 1600m=1.6\n- target_time_minutes: sub-2hr half=120, sub-4hr marathon=240, sub-3:30=210, sub-30min 5k=30, sub-25min=25, sub-20min=20, sub-60min 10k=60, sub-50min=50, sub-40min=40\n- target_pace_sec_per_km: 7:00/km=420, 6:30/km=390, 6:00/km=360, 5:30/km=330, 5:00/km=300, 4:30/km=270\n- weeks_available: extract if mentioned ("in 3 months"=12, "in 16 weeks"=16, "Mumbai Marathon" in Jan from today=estimate)\n- Indian races: Tata Mumbai Marathon=marathon 42.2km Jan, TCS World 10k Bengaluru=10k May, Airtel Delhi Half Marathon=21.1km Nov, Bengaluru Midnight Marathon=42.2km Dec, Comrades=ultra 89km\n- Military: NDA/army/defence/CDS/CRPF 1600m or 2400m = fitness_test\n- goal_type beginner if they say first run, couch to 5k, start running, never run before\n- requires_vdot: true only if they give a specific pace or time target';
 
   try {
     var resp = await callClaude(system, prompt, 200, MODEL_FAST);
@@ -1232,7 +1538,7 @@ async function parseUserGoal(goalText, currentVDOT, weeksAvailable) {
 
 async function exchangeStravaCode(code) {
   try {
-    var fr = await fetch('/.netlify/functions/strava-callback', {
+    var fr = await fetch('/api/strava-callback', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1257,7 +1563,7 @@ async function refreshStravaToken() {
   var refresh = gk('pacer_strava_refresh');
   if (!refresh) return null;
   try {
-    var fr = await fetch('/.netlify/functions/strava-refresh', {
+    var fr = await fetch('/api/strava-refresh', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -5065,6 +5371,8 @@ var SAMPLE_CLUBS = [{
 }];
 function ClubsScreen(props) {
   var userPrefs = props.userPrefs;
+  var setNav = props.setNav;
+  var toast = props.toast;
   var city = userPrefs.city || 'Bengaluru';
   var [tab, setTab] = useState('events');
   var [selEvent, setSelEvent] = useState(null);
@@ -5084,16 +5392,22 @@ function ClubsScreen(props) {
     style: {
       padding: '16px 20px 0'
     }
-  }, /*#__PURE__*/React.createElement("h1", {
-    style: {
-      fontFamily: C.F,
-      fontSize: 26,
-      fontWeight: 800,
-      color: C.t1,
-      letterSpacing: '-.8px',
-      marginBottom: 16
-    }
-  }, "Explore"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {display:'flex',alignItems:'center',gap:10,marginBottom:16}
+  },
+    React.createElement("button", {
+      onClick: function(){ if(setNav) setNav('home'); },
+      style:{background:'none',border:'none',padding:'4px 0',cursor:'pointer',display:'flex',alignItems:'center',gap:4}
+    },
+      React.createElement("svg",{width:"18",height:"18",viewBox:"0 0 24 24",fill:"none",stroke:C.t2,strokeWidth:"2",strokeLinecap:"round"},
+        React.createElement("polyline",{points:"15 18 9 12 15 6"})
+      ),
+      React.createElement("span",{style:{fontSize:13,color:C.t2,fontWeight:500}},"Back")
+    ),
+    React.createElement("h1", {
+      style: {fontFamily: C.F, fontSize: 22, fontWeight: 800, color: C.t1, letterSpacing: '-.5px'}
+    }, "Explore")
+  ), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 4,
@@ -5709,11 +6023,15 @@ function TrainScreen(props) {
     try {
       var weeksToGoal=userPrefs.weeksToGoal||12;
       var savedWeek=loadAIPlan()&&loadAIPlan().weekNumber||1;
+      var resolvedGoal=goalObj||parsedGoal;
+      var profileKey=resolveGoalProfile(resolvedGoal,runnerType);
+      var profile=GOAL_PROFILES[profileKey]||GOAL_PROFILES.general;
+      var effectiveWeeks=Math.min(Math.max(weeksToGoal,profile.minWeeks),profile.maxWeeks);
       var struct = buildPlanStructure(runnerType,goalKm,forecast,runs,today,{
         vdot:currentVDOT||35,
         weekNumber:savedWeek,
-        totalWeeks:weeksToGoal,
-        goalObj:goalObj||parsedGoal,
+        totalWeeks:effectiveWeeks,
+        goalObj:resolvedGoal,
         heatIndex:hi2,
         aqi:wd.aqi||80
       });
@@ -7626,7 +7944,6 @@ function ProfileScreen(props) {
   }
   var [section, setSection] = useState('main');
   var [feedbackText, setFeedbackText] = useState('');
-  var [feedbackText, setFeedbackText] = useState('');
   var [showClubs, setShowClubs] = useState(false);
   var [stravaConnected, setStravaConnected] = useState(!!gk('pacer_strava_token'));
   var profileRuns = (loadRuns().runs||[]);
@@ -7796,7 +8113,67 @@ function ProfileScreen(props) {
     userPrefs: userPrefs
   }), /*#__PURE__*/React.createElement(PlanARunCard, {
     userPrefs: userPrefs
-  }), /*#__PURE__*//*#__PURE__*/React.createElement("div", {style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,marginBottom:14,overflow:'hidden'}},
+  }),
+  /*#__PURE__*/
+// Standalone feedback card below PlanARunCard
+/*#__PURE__*/React.createElement("div", {
+  style: {
+    background: C.card,
+    border: '1px solid ' + C.b1,
+    borderRadius: 16,
+    padding: '20px',
+    marginBottom: 14
+  }
+},
+  /*#__PURE__*/React.createElement("p", {
+    style: { fontFamily: C.F, fontSize: 16, fontWeight: 700, color: C.t1, marginBottom: 4 }
+  }, "Share feedback"),
+  /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 13, color: C.t3, marginBottom: 14, lineHeight: 1.5 }
+  }, "What would make PACER better for you?"),
+  /*#__PURE__*/React.createElement("textarea", {
+    value: feedbackText,
+    onChange: function(e) { setFeedbackText(e.target.value); },
+    placeholder: "Tell us anything   features, bugs, things that felt off...",
+    rows: 5,
+    style: {
+      width: '100%',
+      background: C.card2,
+      border: '1px solid ' + C.b1,
+      borderRadius: 12,
+      padding: '14px',
+      fontSize: 14,
+      color: C.t1,
+      outline: 'none',
+      fontFamily: C.F,
+      resize: 'none',
+      marginBottom: 14,
+      boxSizing: 'border-box',
+      display: 'block',
+      lineHeight: 1.6
+    }
+  }),
+  /*#__PURE__*/React.createElement(Btn, {
+    onClick: async function() {
+      if(!feedbackText.trim()) return;
+      try {
+        var sb = getSupabase();
+        if(sb) {
+          await sb.from('feedback').insert({
+            user_name: userPrefs.name || '',
+            city: userPrefs.city || '',
+            runner_type: userPrefs.runnerType || '',
+            feedback: feedbackText.trim(),
+            app_version: 'beta-v1',
+            created_at: new Date().toISOString()
+          });
+        }
+        setFeedbackText('');
+        showToast('Feedback sent. Thank you.');
+      } catch(e) {}
+    }
+  }, "Send feedback")),
+  /*#__PURE__*/React.createElement("div", {style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,marginBottom:14,overflow:'hidden'}},
     /*#__PURE__*/React.createElement("button", {
       onClick:function(){setSection(section==='settings'?'main':'settings');},
       style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',
@@ -8035,8 +8412,18 @@ function ProfileScreen(props) {
       lineHeight: 1.65
     }
   }, "Connect your personal Strava account. Your runs will sync automatically."), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      fetch('/.netlify/functions/strava-auth-url').then(function(r){return r.json();}).then(function(data){if(data.url)window.location.href=data.url;}).catch(function(){});
+    onClick: async function () {
+      try {
+        var r = await fetch('/api/strava-auth-url');
+        var data = await r.json();
+        if(data.url) {
+          window.location.href = data.url;
+        } else {
+          alert('Strava connect failed: ' + (data.error || 'No URL returned'));
+        }
+      } catch(e) {
+        alert('Strava connect error: ' + e.message);
+      }
     },
     style: {
       display: 'block',
@@ -8172,41 +8559,6 @@ function ProfileScreen(props) {
       }
     }, pair[1])));
   }
-    ),
-    /*#__PURE__*/React.createElement("button", {
-      onClick:function(){setSection(section==='feedback'?'main':'feedback');},
-      style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',
-        padding:'14px 18px',background:'none',border:'none',
-        borderBottom:'none',cursor:'pointer',fontFamily:C.F,textAlign:'left'}
-    },
-    /*#__PURE__*/React.createElement("span",{style:{fontSize:14,fontWeight:500,color:C.t1}},'Share feedback'),
-    /*#__PURE__*/React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",
-      stroke:C.t3,strokeWidth:"2",strokeLinecap:"round",
-      style:{transform:section==='feedback'?'rotate(90deg)':'none',transition:'.2s'}
-    },/*#__PURE__*/React.createElement("polyline",{points:"9 18 15 12 9 6"}))),
-    section==='feedback'&&/*#__PURE__*/React.createElement("div",{style:{padding:'16px 18px'}},
-      /*#__PURE__*/React.createElement("div", null,
-      /*#__PURE__*/React.createElement("textarea", {
-        value: feedbackText, onChange: function(e){setFeedbackText(e.target.value);},
-        placeholder: "What would make PACER better for you?",
-        rows: 4,
-        style: {width:'100%',background:C.card2,border:'1px solid '+C.b1,borderRadius:12,
-          padding:'12px 14px',fontSize:14,color:C.t1,outline:'none',fontFamily:C.F,
-          resize:'vertical',marginBottom:12,boxSizing:'border-box',display:'block'}
-      }),
-      /*#__PURE__*/React.createElement(Btn, {onClick: async function(){
-        if(!feedbackText.trim())return;
-        try{
-          var sb=getSupabase();
-          if(sb){await sb.from('feedback').insert({
-            user_name:userPrefs.name||'',city:userPrefs.city||'',
-            runner_type:userPrefs.runnerType||'',feedback:feedbackText.trim(),
-            app_version:'beta-v1',created_at:new Date().toISOString()
-          });}
-          setFeedbackText('');
-          showToast('Feedback sent. Thank you.');
-        }catch(e){}
-      }}, "Submit"))
     ))));
 }
 
@@ -10955,23 +11307,26 @@ function SplashScreen(props) {
   var readyAt = React.useRef(null);
 
   React.useEffect(function() {
+    // Hard 1.8s cap '' never wait longer than this regardless of brief
+    var hardCapTimer = setTimeout(function() {
+      setBouncing(false);
+      setTimeout(function(){ setFading(true); }, 150);
+      setTimeout(function(){ if(onDone) onDone(); }, 350);
+    }, 1800);
     var interval = setInterval(function() {
       var now = Date.now();
       var elapsed = now - startTime.current;
-      var isReady = briefReady || elapsed >= 9500;
-
-      if(isReady && readyAt.current === null) {
+      // Also exit early if brief is ready AND at least 800ms has passed
+      if(briefReady && elapsed >= 800 && readyAt.current === null) {
         readyAt.current = now;
-      }
-      // Hold for 1.5s after brief is ready before transitioning
-      if(readyAt.current !== null && (now - readyAt.current) >= 1500) {
         clearInterval(interval);
+        clearTimeout(hardCapTimer);
         setBouncing(false);
         setTimeout(function(){ setFading(true); }, 150);
-        setTimeout(function(){ if(onDone) onDone(); }, 400);
+        setTimeout(function(){ if(onDone) onDone(); }, 350);
       }
     }, 100);
-    return function(){ clearInterval(interval); };
+    return function(){ clearInterval(interval); clearTimeout(hardCapTimer); };
   }, [briefReady]);
 
   return React.createElement('div', {style:{
@@ -11349,7 +11704,9 @@ function App() {
     toast: showToast,
     stravaStatus: stravaStatus
   }) : nav === 'clubs' ? /*#__PURE__*/React.createElement(ClubsScreen, {
-    userPrefs: userPrefs
+    userPrefs: userPrefs,
+    setNav: setNav,
+    toast: showToast
   }) : nav === 'train' ? /*#__PURE__*/React.createElement(TrainScreen, {
     userPrefs: userPrefs,
     toast: showToast
