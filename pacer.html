@@ -224,6 +224,7 @@ function mergeStravaRuns(newOnes) {
   store(K.RUNS, s);
   return s;
 }
+
 function loadLog() {
   return load(K.LOG, {});
 }
@@ -287,6 +288,212 @@ function saveAIPlan(plan) {
 }
 
 // --- WEATHER ---
+var COORDS = {
+  Bhubaneswar: {
+    lat: 20.2961,
+    lon: 85.8245
+  },
+  Bengaluru: {
+    lat: 12.9716,
+    lon: 77.5946
+  },
+  Mumbai: {
+    lat: 19.0760,
+    lon: 72.8777
+  },
+  Delhi: {
+    lat: 28.6139,
+    lon: 77.2090
+  },
+  Chennai: {
+    lat: 13.0827,
+    lon: 80.2707
+  },
+  Hyderabad: {
+    lat: 17.3850,
+    lon: 78.4867
+  },
+  Pune: {
+    lat: 18.5204,
+    lon: 73.8567
+  },
+  Kolkata: {
+    lat: 22.5726,
+    lon: 88.3639
+  },
+  Ahmedabad: {
+    lat: 23.0225,
+    lon: 72.5714
+  },
+  Jaipur: {
+    lat: 26.9124,
+    lon: 75.7873
+  }
+};
+var SEASONAL = {
+  Bhubaneswar: [[58, 22, 68], [52, 25, 62], [60, 32, 52], [72, 36, 40], [80, 40, 35], [65, 33, 72], [58, 30, 85], [55, 29, 86], [62, 30, 80], [68, 28, 70], [65, 25, 66], [60, 22, 66]],
+  Bengaluru: [[55, 24, 55], [58, 26, 52], [60, 28, 48], [62, 30, 52], [60, 29, 56], [48, 25, 70], [42, 23, 78], [44, 23, 78], [48, 24, 76], [52, 23, 72], [55, 22, 68], [56, 22, 62]],
+  Mumbai: [[85, 28, 65], [80, 29, 62], [75, 32, 65], [68, 34, 72], [62, 34, 78], [52, 30, 88], [42, 28, 92], [42, 28, 91], [52, 29, 88], [74, 31, 80], [85, 30, 73], [90, 28, 67]],
+  Delhi: [[210, 16, 75], [180, 19, 68], [145, 25, 45], [125, 35, 28], [115, 40, 22], [90, 40, 36], [72, 33, 70], [68, 32, 74], [88, 33, 65], [140, 28, 50], [205, 22, 64], [230, 16, 74]],
+  Chennai: [[66, 28, 72], [62, 30, 68], [64, 33, 62], [68, 36, 60], [70, 38, 58], [58, 34, 72], [52, 32, 80], [50, 32, 82], [58, 32, 80], [72, 30, 76], [78, 28, 74], [72, 28, 72]],
+  Hyderabad: [[58, 24, 58], [54, 27, 52], [60, 32, 42], [70, 36, 28], [75, 40, 22], [65, 34, 45], [55, 28, 72], [52, 27, 74], [58, 28, 68], [65, 26, 58], [62, 24, 60], [62, 23, 60]],
+  Pune: [[52, 22, 52], [48, 25, 48], [54, 30, 42], [62, 34, 34], [65, 36, 30], [52, 28, 60], [44, 25, 72], [42, 25, 74], [48, 26, 70], [52, 24, 62], [55, 22, 58], [54, 22, 54]],
+  Kolkata: [[95, 20, 72], [85, 23, 68], [80, 30, 60], [90, 34, 56], [95, 36, 60], [72, 32, 82], [60, 30, 88], [58, 30, 88], [68, 31, 84], [78, 30, 76], [90, 26, 70], [95, 22, 72]],
+  Ahmedabad: [[68, 22, 55], [62, 25, 48], [70, 32, 36], [82, 38, 22], [88, 42, 18], [72, 38, 40], [62, 32, 65], [60, 30, 68], [68, 32, 60], [72, 28, 50], [72, 24, 52], [70, 22, 54]],
+  Jaipur: [[80, 16, 68], [72, 20, 58], [78, 28, 40], [90, 36, 22], [95, 40, 18], [82, 36, 38], [68, 30, 62], [65, 28, 66], [72, 30, 58], [80, 28, 48], [82, 22, 55], [84, 17, 62]]
+};
+var CITIES = ['Agartala', 'Agra', 'Ahmedabad', 'Aizawl', 'Ajmer', 'Aligarh', 'Allahabad', 'Amravati', 'Amritsar', 'Asansol', 'Aurangabad', 'Bareilly', 'Belgaum', 'Bengaluru', 'Bhopal', 'Bhubaneswar', 'Bikaner', 'Chandigarh', 'Chennai', 'Coimbatore', 'Cuttack', 'Davanagere', 'Dehradun', 'Delhi', 'Dhanbad', 'Durgapur', 'Erode', 'Faridabad', 'Firozabad', 'Ghaziabad', 'Gorakhpur', 'Gulbarga', 'Guntur', 'Gurgaon', 'Guwahati', 'Gwalior', 'Hubballi', 'Hyderabad', 'Imphal', 'Indore', 'Itanagar', 'Jabalpur', 'Jaipur', 'Jalandhar', 'Jammu', 'Jamshedpur', 'Jodhpur', 'Kanpur', 'Kochi', 'Kohima', 'Kolkata', 'Kota', 'Kozhikode', 'Lucknow', 'Ludhiana', 'Madurai', 'Mangalore', 'Meerut', 'Mumbai', 'Mysuru', 'Nagpur', 'Nashik', 'Navi Mumbai', 'Noida', 'Patna', 'Pondicherry', 'Pune', 'Raipur', 'Rajkot', 'Ranchi', 'Salem', 'Shillong', 'Shimla', 'Siliguri', 'Srinagar', 'Surat', 'Thiruvananthapuram', 'Tiruchirappalli', 'Tiruppur', 'Udaipur', 'Vadodara', 'Varanasi', 'Vijayawada', 'Visakhapatnam', 'Warangal'];
+var PACER_BRAIN_KEY = 'pacer_brain';
+function loadBrain() {
+  var def = { entries: [], stats: { total_calls:0, cache_hits:0, saved_tokens:0 } };
+  return load(PACER_BRAIN_KEY, def);
+}
+function saveBrain(brain) {
+  store(PACER_BRAIN_KEY, brain);
+}
+function classifyIntent(system, user) {
+  var s = (system+' '+user).toLowerCase();
+  if(s.includes('weather')||s.includes('aqi')||s.includes('heat')) return 'weather';
+  if(s.includes('food')||s.includes('eat')||s.includes('meal')||s.includes('fuel')) return 'food';
+  if(s.includes('recovery')||s.includes('rest')||s.includes('sleep')) return 'recovery';
+  if(s.includes('pace')||s.includes('tempo')||s.includes('interval')||s.includes('speed')) return 'pace';
+  if(s.includes('train')||s.includes('plan')||s.includes('week')||s.includes('session')) return 'training';
+  return 'general';
+}
+function extractContext(user) {
+  var ctx = {};
+  var cityMatch = user.match(/City:\s*(\w+)/i);
+  if(cityMatch) ctx.city = cityMatch[1];
+  var runnerMatch = user.match(/runner[_ ]type[:\s]+(\w+)/i);
+  if(runnerMatch) ctx.runnerType = runnerMatch[1];
+  var weekMatch = user.match(/(\d+)\s*km[\s/]*(week|wk)/i);
+  if(weekMatch) ctx.weeklyKm = weekMatch[1];
+  var condMatch = user.match(/(GO RUN|GO EASY|WAIT|REST)/);
+  if(condMatch) ctx.verdict = condMatch[1];
+  return ctx;
+}
+
+// Simple similarity: how many context keys match
+function contextMatch(ctx1, ctx2){
+  if(!ctx1||!ctx2) return 0;
+  var keys = Object.keys(ctx1);
+  if(!keys.length) return 0;
+  var matches = keys.filter(function(k){ return ctx1[k]===ctx2[k]; }).length;
+  return matches/keys.length;
+}
+
+// Look for a cached answer - only serve if high confidence + matching context
+function findCachedAnswer(system, user, intent, ctx){
+  // Don't cache very short or vague questions - they lack context for reliable matching
+  if(user.trim().length < 20) return null;
+  var brain = loadBrain();
+  var candidates = brain.entries.filter(function(e){
+    return e.intent===intent && e.confidence>=0.7;
+  });
+  if(!candidates.length) return null;
+  // Find best context match
+  var best = null;
+  var bestScore = 0;
+  candidates.forEach(function(e){
+    var score = contextMatch(ctx, e.context);
+    if(score > bestScore){ bestScore=score; best=e; }
+  });
+  // Only serve if context matches at least 60%
+  if(best && bestScore >= 0.6){
+    return best;
+  }
+  return null;
+}
+
+// Log a new interaction
+function logInteraction(system, user, answer, intent, ctx, fromCache){
+  var brain = loadBrain();
+  var entry = {
+    id: Date.now()+'-'+Math.random().toString(36).substr(2,6),
+    ts: Date.now(),
+    date: new Date().toISOString().split('T')[0],
+    intent: intent,
+    context: ctx,
+    // Store compressed versions (first 120 chars) to save space
+    question_snippet: user.substring(0,120),
+    answer: answer,
+    answer_length: answer.length,
+    from_cache: fromCache,
+    confidence: fromCache ? (findCachedAnswer(system,user,intent,ctx)||{confidence:0.7}).confidence : 0.5,
+    outcome: null,       // filled in later by post-run check-in
+    used_count: 1,
+    last_used: Date.now()
+  };
+
+  if(!fromCache){
+    // Check if very similar entry exists - update instead of duplicate
+    var existing = brain.entries.find(function(e){
+      return e.intent===intent && contextMatch(ctx,e.context)>0.8 &&
+        e.answer.substring(0,50)===answer.substring(0,50);
+    });
+    if(existing){
+      existing.used_count++;
+      existing.last_used=Date.now();
+    } else {
+      brain.entries.push(entry);
+      // Keep last 500 entries (rotate out oldest low-confidence ones)
+      if(brain.entries.length>500){
+        brain.entries.sort(function(a,b){
+          var scoreA = a.confidence * Math.log(a.used_count+1);
+          var scoreB = b.confidence * Math.log(b.used_count+1);
+          return scoreB-scoreA;
+        });
+        brain.entries = brain.entries.slice(0,400);
+      }
+    }
+    brain.stats.total_calls++;
+  } else {
+    brain.stats.cache_hits++;
+    brain.stats.saved_tokens += 200; // avg tokens per call
+    // Update existing entry
+    var cached = brain.entries.find(function(e){return e.id===entry.id;});
+    if(cached){ cached.used_count++; cached.last_used=Date.now(); }
+  }
+
+  saveBrain(brain);
+  return entry;
+}
+
+// Called from post-run check-in to update confidence on recent interactions
+function updateBrainOutcome(outcome, runDate){
+  var brain = loadBrain();
+  var today = runDate || new Date().toISOString().split('T')[0];
+  var recent = brain.entries.filter(function(e){
+    return e.date===today && e.outcome===null;
+  });
+  recent.forEach(function(e){
+    e.outcome = outcome;
+    // Positive outcome boosts confidence, negative decreases it
+    var delta = (outcome==='great'||outcome==='good') ? 0.08 :
+                (outcome==='okay') ? 0.02 :
+                (outcome==='tough') ? -0.05 : 0;
+    e.confidence = Math.max(0.2, Math.min(0.98, (e.confidence||0.5)+delta));
+  });
+  saveBrain(brain);
+}
+
+// Get brain stats for display
+function getBrainStats(){
+  var b = loadBrain();
+  var hitRate = b.stats.total_calls>0 ?
+    Math.round(b.stats.cache_hits/(b.stats.total_calls+b.stats.cache_hits)*100) : 0;
+  return {
+    entries: b.entries.length,
+    total_calls: b.stats.total_calls,
+    cache_hits: b.stats.cache_hits,
+    hit_rate: hitRate+'%',
+    saved_tokens: b.stats.saved_tokens,
+    high_confidence: b.entries.filter(function(e){return e.confidence>=0.8;}).length
+  };
+}
+
+
+
 var COORDS = {
   Bhubaneswar: {
     lat: 20.2961,
@@ -480,194 +687,14 @@ async function fetchLiveWeather(city) {
 // --- API ---
 var MODEL_FAST = 'claude-haiku-4-5-20251001';
 var MODEL_DEEP = 'claude-sonnet-4-20250514';
-function getApiKey() {
-  return gk('pacer_claude_key');
-}
 function stripMd(t) {
   if (!t) return t;
-  return t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').replace(/#{1,3} /g, '').replace(/`([^`]+)`/g, '$1').trim();
+  return t.replace(/\*\*([^*]+)\*\*/g, '$1')
+          .replace(/\*([^*]+)\*/g, '$1')
+          .replace(/#{1,3} /g, '')
+          .replace(/`([^`]+)`/g, '$1')
+          .trim();
 }
-// ===============================================
-// PACER BRAIN -- Interaction Log + Simple Cache
-// Phase 1: Capture everything. Build data first.
-// ===============================================
-
-var BRAIN_KEY = 'pacer_brain';
-var BRAIN_VERSION = 1;
-
-function loadBrain(){
-  try{
-    var b = JSON.parse(localStorage.getItem(BRAIN_KEY)||'null');
-    if(!b||b.version!==BRAIN_VERSION) return {version:BRAIN_VERSION,entries:[],stats:{total_calls:0,cache_hits:0,saved_tokens:0}};
-    return b;
-  }catch(e){return {version:BRAIN_VERSION,entries:[],stats:{total_calls:0,cache_hits:0,saved_tokens:0}};}
-}
-
-function saveBrain(brain){
-  try{localStorage.setItem(BRAIN_KEY, JSON.stringify(brain));}catch(e){}
-}
-
-// Classify the intent of a question for grouping
-function classifyIntent(system, user){
-  var u = user.toLowerCase();
-  var s = system.toLowerCase();
-  if(s.includes('nutritionist')||u.includes('ate')||u.includes('food')||u.includes('eat')) return 'fuel';
-  if(s.includes('briefing')||u.includes('today')||u.includes('window')||u.includes('run today')) return 'daily_brief';
-  if(u.includes('recovery')||u.includes('sore')||u.includes('tired')) return 'recovery';
-  if(u.includes('plan')||u.includes('week')||u.includes('training')) return 'planning';
-  if(u.includes('pace')||u.includes('speed')||u.includes('interval')) return 'pace_advice';
-  if(u.includes('rest')||u.includes('skip')) return 'rest_decision';
-  if(u.includes('injury')||u.includes('pain')||u.includes('hurt')) return 'injury';
-  return 'general';
-}
-
-// Extract key context signals from prompt for matching
-function extractContext(user){
-  var ctx = {};
-  // AQI range
-  var aqiMatch = user.match(/AQI[:\s]+?(\d+)/i);
-  if(aqiMatch){
-    var aqi = parseInt(aqiMatch[1]);
-    ctx.aqi_band = aqi<50?'good':aqi<100?'moderate':aqi<150?'unhealthy':aqi<200?'very_unhealthy':'hazardous';
-  }
-  // Heat band
-  var heatMatch = user.match(/(\d+)[\s]*C\s*heat/i)||user.match(/heat.*?(\d+)[\s]*C/i);
-  if(heatMatch){
-    var hi = parseInt(heatMatch[1]);
-    ctx.heat_band = hi<30?'cool':hi<36?'warm':hi<40?'hot':'extreme';
-  }
-  // Time of day
-  var hour = new Date().getHours();
-  ctx.time_band = hour<6?'pre_dawn':hour<10?'morning':hour<14?'midday':hour<18?'afternoon':hour<21?'evening':'night';
-  // State if present
-  var stateMatch = user.match(/State:\s*([a-z_]+)/i);
-  if(stateMatch) ctx.day_state = stateMatch[1];
-  // City
-  var cityMatch = user.match(/City:\s*(\w+)/i);
-  if(cityMatch) ctx.city = cityMatch[1];
-  return ctx;
-}
-
-// Simple similarity: how many context keys match
-function contextMatch(ctx1, ctx2){
-  if(!ctx1||!ctx2) return 0;
-  var keys = Object.keys(ctx1);
-  if(!keys.length) return 0;
-  var matches = keys.filter(function(k){ return ctx1[k]===ctx2[k]; }).length;
-  return matches/keys.length;
-}
-
-// Look for a cached answer - only serve if high confidence + matching context
-function findCachedAnswer(system, user, intent, ctx){
-  // Don't cache very short or vague questions - they lack context for reliable matching
-  if(user.trim().length < 20) return null;
-  var brain = loadBrain();
-  var candidates = brain.entries.filter(function(e){
-    return e.intent===intent && e.confidence>=0.7;
-  });
-  if(!candidates.length) return null;
-  // Find best context match
-  var best = null;
-  var bestScore = 0;
-  candidates.forEach(function(e){
-    var score = contextMatch(ctx, e.context);
-    if(score > bestScore){ bestScore=score; best=e; }
-  });
-  // Only serve if context matches at least 60%
-  if(best && bestScore >= 0.6){
-    return best;
-  }
-  return null;
-}
-
-// Log a new interaction
-function logInteraction(system, user, answer, intent, ctx, fromCache){
-  var brain = loadBrain();
-  var entry = {
-    id: Date.now()+'-'+Math.random().toString(36).substr(2,6),
-    ts: Date.now(),
-    date: new Date().toISOString().split('T')[0],
-    intent: intent,
-    context: ctx,
-    // Store compressed versions (first 120 chars) to save space
-    question_snippet: user.substring(0,120),
-    answer: answer,
-    answer_length: answer.length,
-    from_cache: fromCache,
-    confidence: fromCache ? (findCachedAnswer(system,user,intent,ctx)||{confidence:0.7}).confidence : 0.5,
-    outcome: null,       // filled in later by post-run check-in
-    used_count: 1,
-    last_used: Date.now()
-  };
-
-  if(!fromCache){
-    // Check if very similar entry exists - update instead of duplicate
-    var existing = brain.entries.find(function(e){
-      return e.intent===intent && contextMatch(ctx,e.context)>0.8 &&
-        e.answer.substring(0,50)===answer.substring(0,50);
-    });
-    if(existing){
-      existing.used_count++;
-      existing.last_used=Date.now();
-    } else {
-      brain.entries.push(entry);
-      // Keep last 500 entries (rotate out oldest low-confidence ones)
-      if(brain.entries.length>500){
-        brain.entries.sort(function(a,b){
-          var scoreA = a.confidence * Math.log(a.used_count+1);
-          var scoreB = b.confidence * Math.log(b.used_count+1);
-          return scoreB-scoreA;
-        });
-        brain.entries = brain.entries.slice(0,400);
-      }
-    }
-    brain.stats.total_calls++;
-  } else {
-    brain.stats.cache_hits++;
-    brain.stats.saved_tokens += 200; // avg tokens per call
-    // Update existing entry
-    var cached = brain.entries.find(function(e){return e.id===entry.id;});
-    if(cached){ cached.used_count++; cached.last_used=Date.now(); }
-  }
-
-  saveBrain(brain);
-  return entry;
-}
-
-// Called from post-run check-in to update confidence on recent interactions
-function updateBrainOutcome(outcome, runDate){
-  var brain = loadBrain();
-  var today = runDate || new Date().toISOString().split('T')[0];
-  var recent = brain.entries.filter(function(e){
-    return e.date===today && e.outcome===null;
-  });
-  recent.forEach(function(e){
-    e.outcome = outcome;
-    // Positive outcome boosts confidence, negative decreases it
-    var delta = (outcome==='great'||outcome==='good') ? 0.08 :
-                (outcome==='okay') ? 0.02 :
-                (outcome==='tough') ? -0.05 : 0;
-    e.confidence = Math.max(0.2, Math.min(0.98, (e.confidence||0.5)+delta));
-  });
-  saveBrain(brain);
-}
-
-// Get brain stats for display
-function getBrainStats(){
-  var b = loadBrain();
-  var hitRate = b.stats.total_calls>0 ?
-    Math.round(b.stats.cache_hits/(b.stats.total_calls+b.stats.cache_hits)*100) : 0;
-  return {
-    entries: b.entries.length,
-    total_calls: b.stats.total_calls,
-    cache_hits: b.stats.cache_hits,
-    hit_rate: hitRate+'%',
-    saved_tokens: b.stats.saved_tokens,
-    high_confidence: b.entries.filter(function(e){return e.confidence>=0.8;}).length
-  };
-}
-
-
 async function callClaude(system, user, maxTok, model) {
   var mdl = model || MODEL_DEEP;
   var intent = classifyIntent(system, user);
@@ -694,17 +721,8 @@ async function callClaude(system, user, maxTok, model) {
     }
   } catch(fe){}
 
-  if(!answer){
-    var key = getApiKey();
-    if(!key) throw new Error('no key');
-    var r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({model:mdl, max_tokens:maxTok||200, system:system, messages:[{role:'user',content:user}]})
-    });
-    var d = await r.json();
-    answer = stripMd((d.content&&d.content[0]&&d.content[0].text)||'');
-  }
+  // Proxy is the only path   no client-side key fallback
+  if(!answer) { return ''; }
 
   // == Log to brain ==
   if(answer && answer.length > 10){
@@ -861,8 +879,8 @@ function getQualityType(phase, goalType) {
 
 // -- NEW buildPlanStructure (replaces old one) ------------------
 
+
 function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, params) {
-  // params: { vdot, weekNumber, totalWeeks, goalObj, heatIndex, aqi }
   var p = params||{};
   var vdot = p.vdot || estimateCurrentVDOT(recentRuns) || 35;
   var paces = getTrainingPaces(vdot);
@@ -876,67 +894,147 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
   var hi2 = p.heatIndex||hiCalc(wd.temp,wd.humidity);
   var aqi2 = p.aqi||wd.aqi||80;
 
-  // Weekly volume
-  var weeklyKm = loadRuns().weeklyKm||goalKm*0.5||20;
+  // Goal-based weekly volume minimums
+  var goalMin = (goalType==='race'||goalType==='marathon'||goalKm>=40)?28:
+                goalType==='half'?22:
+                (goalType==='5k'||goalType==='pace'||goalType==='fitness_test')?18:
+                (tier==='tier_1'||runnerType==='beginner')?12:15;
+  var weeklyKm = loadRuns().weeklyKm||0;
+  if(!weeklyKm) weeklyKm = goalMin;
+
+  // Every 4th week = deload
   var isRecoveryWeek = weekNum%4===0;
   var targetKm = isRecoveryWeek ? Math.round(weeklyKm*0.72) : Math.round(weeklyKm*1.08);
   if(phase==='TAPER') {
     var taperW = weekNum-(phases.base+phases.build+phases.peak);
     targetKm = Math.round(weeklyKm*(1-taperW*0.22));
   }
-  targetKm = Math.max(10, Math.min(80, targetKm));
+  targetKm = Math.max(goalMin, Math.min(80, targetKm));
 
-  // 5-day verdict from forecast
-  var verdicts = forecast.slice(0,5).map(function(f){ return f.verdict||'GO'; });
-  var badDays = verdicts.map(function(v,i){ return (v==='WAIT'||v==='REST')?i:-1; }).filter(function(i){ return i>=0; });
+  // Adjust paces for conditions
+  var adjE = adjustPaceForConditions(paces.E, hi2, aqi2);
+  var adjT = adjustPaceForConditions(paces.T, hi2, aqi2);
+  var adjI = adjustPaceForConditions(paces.I, hi2, aqi2);
 
-  // Quality sessions count
-  var qualCount = phase==='BASE'?0:phase==='BUILD'?(targetKm>=25?1:0):phase==='PEAK'?(targetKm>=30?2:1):1;
-  if(tier==='tier_1') qualCount=Math.min(qualCount,1);
+  // Max running days by tier
+  var maxRunDays = tier==='tier_1'?3:tier==='tier_2'?4:5;
 
-  // Long run: Saturday (day 5 in Mon-Sun), avoid bad AQI
+  // Align forecast to day names
   var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var forecastByDay={};
+  if(forecast) forecast.forEach(function(f){ forecastByDay[f.day]=f.verdict||'GO RUN'; });
+  var badDays=DAYS.map(function(day,i){
+    var v=forecastByDay[day]||'GO RUN';
+    return (v==='WAIT'||v==='REST')?i:-1;
+  }).filter(function(i){ return i>=0; });
+
+  // STEP 1: Long run day (Sat=5, else Sun=6, else Fri=4)
   var longRunDay=5;
   if(badDays.includes(5)) longRunDay=6;
   if(badDays.includes(5)&&badDays.includes(6)) longRunDay=4;
+  var longKm=Math.round(targetKm*0.29);
 
-  var longKm = Math.round(targetKm*0.29);
-  var qualKm = qualCount>0?Math.round(targetKm*0.18/qualCount):0;
+  // STEP 2: Recovery jog = day after long run
+  var recoveryDay=(longRunDay+1)%7;
 
-  // Pick quality days: good AQI, not long run day, >=2 days apart
-  var goodDays=[0,1,2,3,4,5,6].filter(function(d){ return !badDays.includes(d)&&d!==longRunDay; });
+  // STEP 3: Quality session (only in BUILD/PEAK, never BASE)
+  var qualCount=0;
+  if(phase==='BUILD') qualCount=targetKm>=25?1:0;
+  else if(phase==='PEAK') qualCount=targetKm>=28?2:1;
+  else if(phase==='TAPER') qualCount=1;
+  if(tier==='tier_1') qualCount=0; // tier_1 never gets quality
+  if(isRecoveryWeek&&qualCount>1) qualCount=1;
+
+  var qualType=phase==='PEAK'?'intervals':'tempo';
+  var qualKm=qualCount>0?Math.round(targetKm*0.18/qualCount):0;
+
+  // Pick quality days: not long/recovery, not bad AQI, >=2 days from long, >=2 from each other
   var qualDays=[];
-  goodDays.forEach(function(d){
-    if(qualDays.length>=qualCount) return;
-    var tooClose=qualDays.some(function(q){ return Math.abs(q-d)<2; })||Math.abs(d-longRunDay)<2;
-    if(!tooClose) qualDays.push(d);
+  if(qualCount>0){
+    var candidates=DAYS.map(function(_,i){ return i; }).filter(function(i){
+      return !badDays.includes(i)&&i!==longRunDay&&i!==recoveryDay&&
+             Math.abs(i-longRunDay)>=2&&Math.abs(i-recoveryDay)>=1;
+    });
+    candidates.forEach(function(d){
+      if(qualDays.length>=qualCount) return;
+      var tooClose=qualDays.some(function(q){ return Math.abs(q-d)<2; });
+      if(!tooClose) qualDays.push(d);
+    });
+  }
+
+  // STEP 4: Fill easy runs up to maxRunDays
+  var assignedDays=[longRunDay,recoveryDay].concat(qualDays);
+  var easyRunDays=[];
+  var easyKm=Math.max(5,Math.round((targetKm-longKm-Math.round(longKm*0.4)-qualKm*qualDays.length)/Math.max(1,maxRunDays-assignedDays.length)));
+  
+  // Rotating easy run names by phase
+  var easyNames={
+    BASE:['Aerobic base run','Foundation run'],
+    BUILD:['Easy run with strides','Easy aerobic','Easy aerobic'],
+    PEAK:['Easy shakeout','Easy aerobic'],
+    TAPER:['Easy shakeout','Easy aerobic']
+  };
+  var namePool=easyNames[phase]||easyNames.BASE;
+  var easyNameIdx=0;
+
+  var allRunCandidates=DAYS.map(function(_,i){return i;}).filter(function(i){
+    return !assignedDays.includes(i)&&!badDays.includes(i);
   });
 
-  // Easy days volume
-  var usedKm = longKm + qualKm*qualDays.length;
-  var easyDayCount = DAYS.filter(function(_,i){ return !badDays.includes(i)&&i!==longRunDay&&!qualDays.includes(i)&&i!==((longRunDay+1)%7); }).length||1;
-  var easyKm = Math.max(4, Math.round((targetKm-usedKm-Math.round(longKm*0.4))/easyDayCount));
+  allRunCandidates.forEach(function(d){
+    if(assignedDays.length>=maxRunDays) return;
+    assignedDays.push(d);
+    easyRunDays.push(d);
+  });
 
-  var qualType = getQualityType(phase, goalType);
-  var schedule = {};
-  DAYS.forEach(function(day, i){
-    var adjE = adjustPaceForConditions(paces.E, hi2, aqi2);
-    var adjT = adjustPaceForConditions(paces.T, hi2, aqi2);
-    var adjI = adjustPaceForConditions(paces.I, hi2, aqi2);
-    if(i===longRunDay) {
-      schedule[day]={type:'long',km:phase==='TAPER'?Math.round(longKm*0.7):longKm,zone:'E',pace:adjE,pacePlain:fmtPaceSec(adjE)};
-    } else if(qualDays.includes(i)) {
-      var qz=qualType==='tempo'?'T':qualType==='intervals'?'I':'T';
-      schedule[day]={type:qualType,km:qualKm,zone:qz,pace:qualType==='intervals'?adjI:adjT,pacePlain:fmtPaceSec(qualType==='intervals'?adjI:adjT)};
-    } else if(badDays.includes(i)) {
-      schedule[day]={type:'rest',km:0};
-    } else if(i===(longRunDay+1)%7) {
-      var recKm=Math.round(easyKm*0.6);
-      schedule[day]={type:'recovery',km:recKm,zone:'E',pace:adjE+30,pacePlain:fmtPaceSec(adjE+30)};
-    } else {
-      schedule[day]={type:'easy',km:easyKm,zone:'E',pace:adjE,pacePlain:fmtPaceSec(adjE)};
+  // STEP 5: Check for 3+ consecutive running days and break them up
+  var runSet=new Set(assignedDays);
+  DAYS.forEach(function(_,i){
+    var prev=(i-1+7)%7, next=(i+1)%7;
+    if(runSet.has(i)&&runSet.has(prev)&&runSet.has(next)){
+      // i is the middle of 3 consecutive   convert to rest unless it's long/quality
+      if(!qualDays.includes(i)&&i!==longRunDay&&i!==recoveryDay){
+        runSet.delete(i);
+        easyRunDays=easyRunDays.filter(function(d){ return d!==i; });
+      }
     }
   });
+
+  // Build schedule
+  var schedule={};
+  DAYS.forEach(function(day,i){
+    if(i===longRunDay){
+      schedule[day]={type:'long',name:'Long run',km:phase==='TAPER'?Math.round(longKm*0.7):longKm,zone:'E',pace:adjE,pacePlain:fmtPaceSec(adjE)};
+    } else if(i===recoveryDay&&runSet.has(i)){
+      var recKm=Math.max(4,Math.round(longKm*0.4));
+      schedule[day]={type:'recovery',name:'Recovery jog',km:recKm,zone:'E',pace:adjE+60,pacePlain:fmtPaceSec(adjE+60)};
+    } else if(qualDays.includes(i)){
+      var qLabel=qualType==='tempo'?'Tempo run':'Intervals';
+      var qz=qualType==='intervals'?'I':'T';
+      var qPace=qualType==='intervals'?adjI:adjT;
+      // Deload: cut km by 40% on recovery week
+      var qKmFinal=isRecoveryWeek?Math.round(qualKm*0.6):qualKm;
+      schedule[day]={type:qualType,name:qLabel,km:qKmFinal,zone:qz,pace:qPace,pacePlain:fmtPaceSec(qPace)};
+    } else if(runSet.has(i)&&easyRunDays.includes(i)){
+      var eName=namePool[easyNameIdx%namePool.length]; easyNameIdx++;
+      schedule[day]={type:'easy',name:eName,km:easyKm,zone:'E',pace:adjE,pacePlain:fmtPaceSec(adjE)};
+    } else {
+      schedule[day]={type:'rest',name:'Rest day',km:0};
+    }
+  });
+
+  // Guarantee minimum 2 rest days
+  var restCount=DAYS.filter(function(d){ return schedule[d].type==='rest'; }).length;
+  if(restCount<2){
+    // Convert easiest easy run to rest (prefer mid-week non-adjacent to quality)
+    var extras=easyRunDays.filter(function(d){
+      return !qualDays.includes(d)&&d!==longRunDay&&d!==recoveryDay;
+    });
+    if(extras.length>0){
+      var makeRest=extras[Math.floor(extras.length/2)];
+      schedule[DAYS[makeRest]]={type:'rest',name:'Rest day',km:0};
+    }
+  }
 
   return {
     phase:phase, weekNumber:weekNum, totalWeeks:totalWeeks,
@@ -947,6 +1045,117 @@ function buildPlanStructure(runnerType, goalKm, forecast, recentRuns, todayIdx, 
     phaseDesc:getPhaseDesc(phase)
   };
 }
+
+
+
+//    applyWeatherToSchedule                                                 
+// Call after buildPlanStructure. Adjusts today's and future sessions
+// based on actual forecast. Returns { schedule, swapNotes }.
+function applyWeatherToSchedule(schedule, forecast, city) {
+  if(!schedule||!forecast||!forecast.length) return {schedule:schedule, swapNotes:[]};
+
+  var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var today=new Date().getDay(); // 0=Sun
+  // Convert JS getDay (0=Sun) to Mon-indexed (0=Mon)
+  var todayIdx=(today===0)?6:(today-1);
+  var todayName=DAYS[todayIdx];
+  var todaySess=schedule[todayName];
+  if(!todaySess) return {schedule:schedule, swapNotes:[]};
+
+  var swapNotes=[];
+  var sched=Object.assign({},schedule);
+  DAYS.forEach(function(d){ sched[d]=Object.assign({},schedule[d]); });
+
+  // Build forecast lookup by day name
+  var fcByDay={};
+  forecast.forEach(function(f){ fcByDay[f.day]={verdict:f.verdict||'GO RUN',hi:f.heatIdx||f.heatIndex||30,aqi:f.aqi||80}; });
+
+  var todayFc=fcByDay[todayName]||{verdict:'GO RUN',hi:30,aqi:80};
+
+  // RULE A: Quality session on bad AQI day
+  if((todaySess.type==='tempo'||todaySess.type==='intervals')&&
+     (todayFc.verdict==='WAIT'||todayFc.verdict==='REST')){
+    // Find earliest future day with good conditions and easy/rest session
+    var swapDay=null;
+    for(var k=1;k<=6;k++){
+      var futureIdx=(todayIdx+k)%7;
+      var futureName=DAYS[futureIdx];
+      var futureFc=fcByDay[futureName]||{verdict:'GO RUN'};
+      var futureSess=sched[futureName];
+      if((futureFc.verdict==='GO RUN'||futureFc.verdict==='GO EASY')&&
+         futureSess&&(futureSess.type==='easy'||futureSess.type==='rest')){
+        swapDay=futureName; break;
+      }
+    }
+    if(swapDay){
+      var qualSess=Object.assign({},todaySess);
+      sched[swapDay]=qualSess;
+      sched[todayName]={type:'easy',name:'Easy aerobic',km:sched[todayName].km||6,zone:'E',
+        pace:sched[todayName].pace,pacePlain:sched[todayName].pacePlain};
+      swapNotes.push(todaySess.name+' moved to '+swapDay+' -- AQI '+todayFc.aqi+
+        ' and heat index '+todayFc.hi+'C today. '+swapDay+"'s forecast looks better.");
+    }
+  }
+
+  // RULE B: Long run on dangerously hot day
+  var todaySess2=sched[todayName];
+  if(todaySess2.type==='long'&&todayFc.hi>38){
+    var swapDayB=null;
+    for(var j=1;j<=6;j++){
+      var fidx=(todayIdx+j)%7;
+      var fname=DAYS[fidx];
+      var ffc=fcByDay[fname]||{verdict:'GO RUN',hi:30};
+      var fs=sched[fname];
+      if((ffc.verdict==='GO RUN'||ffc.verdict==='GO EASY')&&fs&&
+         (fs.type==='easy'||fs.type==='rest'||fs.type==='recovery')){
+        swapDayB=fname; break;
+      }
+    }
+    if(swapDayB){
+      sched[swapDayB]=Object.assign({},todaySess2);
+      sched[todayName]={type:'rest',name:'Rest day',km:0};
+      swapNotes.push('Long run moved to '+swapDayB+' -- heat index '+todayFc.hi+
+        'C makes long efforts unsafe today. Extra heat stress accumulates over distance.');
+    }
+  }
+
+  // RULE C: Yesterday was WAIT/REST conditions -- override today to recovery
+  var yestIdx=(todayIdx-1+7)%7;
+  var yestName=DAYS[yestIdx];
+  var yestFc=fcByDay[yestName]||{verdict:'GO RUN'};
+  var yestLog=loadLog()[todayStr()]; // check if yesterday had a logged run in bad conditions
+  var todayLog=loadLog();
+  var yesterday=new Date(Date.now()-86400000).toISOString().split('T')[0];
+  var yestEntry=todayLog[yesterday]||{};
+  if((yestFc.verdict==='WAIT'||yestFc.verdict==='REST')&&yestEntry.feel){
+    var curr=sched[todayName];
+    if(curr&&curr.type!=='rest'&&curr.type!=='recovery'){
+      var recKm=Math.max(4,Math.round((curr.km||6)*0.5));
+      sched[todayName]={type:'recovery',name:'Recovery jog',km:recKm,zone:'E',
+        pace:(curr.pace||360)+30,pacePlain:fmtPaceSec((curr.pace||360)+30)};
+      swapNotes.push("Recovery day -- yesterday's conditions were very demanding. Your body needs 48 hours not 24.");
+    }
+  }
+
+  // RULE D: No good days all week
+  var goodDays=forecast.filter(function(f){
+    return f.verdict==='GO RUN'||f.verdict==='GO EASY';
+  });
+  if(goodDays.length===0){
+    DAYS.forEach(function(day){
+      var s=sched[day];
+      if(s&&(s.type==='tempo'||s.type==='intervals')&&s.km>0){
+        sched[day]=Object.assign({},s,{km:Math.max(3,Math.round(s.km*0.6))});
+        if(!swapNotes.some(function(n){ return n.indexOf('shortened')>-1; })){
+          swapNotes.push('Tough week conditions across all days. Quality session shortened by 40%. Consistency this week matters more than hitting full targets.');
+        }
+      }
+    });
+  }
+
+  return {schedule:sched, swapNotes:swapNotes};
+}
+
 
 // -- GENERATE WEEKLY PLAN WITH CLAUDE --------------------------
 
@@ -1020,6 +1229,55 @@ async function parseUserGoal(goalText, currentVDOT, weeksAvailable) {
 
 
 
+
+async function exchangeStravaCode(code) {
+  try {
+    var fr = await fetch('/.netlify/functions/strava-callback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        code: code
+      })
+    });
+    if (fr.ok) {
+      var fd = await fr.json();
+      if (fd.access_token) {
+        sk('pacer_strava_token', fd.access_token);
+        sk('pacer_strava_refresh', fd.refresh_token);
+        sk('pacer_strava_expiry', String(fd.expires_at));
+        return true;
+      }
+    }
+  } catch (fe) {}
+  return false;
+}
+async function refreshStravaToken() {
+  var refresh = gk('pacer_strava_refresh');
+  if (!refresh) return null;
+  try {
+    var fr = await fetch('/.netlify/functions/strava-refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refresh_token: refresh
+      })
+    });
+    if (fr.ok) {
+      var fd = await fr.json();
+      if (fd.access_token) {
+        sk('pacer_strava_token', fd.access_token);
+        sk('pacer_strava_refresh', fd.refresh_token);
+        sk('pacer_strava_expiry', String(fd.expires_at));
+        return fd.access_token;
+      }
+    }
+  } catch (fe) {}
+  return null;
+}
 function getStravaToken() {
   var token = gk('pacer_strava_token');
   var expiry = parseInt(gk('pacer_strava_expiry') || '0');
@@ -1027,6 +1285,100 @@ function getStravaToken() {
   if (expiry && Date.now() / 1000 > expiry - 300) return null;
   return token;
 }
+function stravaAuthUrl() {
+  var redirect = window.location.origin + window.location.pathname;
+  return 'https://www.strava.com/oauth/authorize?client_id=' + gk('pacer_strava_id') + '&response_type=code&redirect_uri=' + encodeURIComponent(redirect) + '&approval_prompt=auto&scope=activity:read_all';
+}
+async function syncStravaActivities() {
+  var token = getStravaToken();
+  if (!token) {
+    // Try to refresh
+    var newToken = await refreshStravaToken();
+    if (!newToken) return null;
+    token = newToken;
+  }
+  // First sync: get last 60 days. Subsequent: last 2 days overlap
+  var lastSync = parseInt(gk('pacer_last_autosync') || '0');
+  var isFirstSync = lastSync === 0;
+  var after = isFirstSync ? Math.floor((Date.now() - 60 * 86400000) / 1000) : Math.floor(lastSync / 1000) - 7200; // 2hr overlap
+  var perPage = isFirstSync ? 50 : 20;
+  try {
+    var res = await fetch('https://www.strava.com/api/v3/athlete/activities?after=' + after + '&per_page=' + perPage, {
+      headers: {
+        Authorization: 'Bearer ' + token
+      }
+    });
+    if (!res.ok) {
+      sk('pacer_strava_sync_error', res.status + ' ' + (await res.text()));
+      return null;
+    }
+    var activities = await res.json();
+    if (!Array.isArray(activities)) {
+      sk('pacer_strava_sync_error', 'Non-array response');
+      return null;
+    }
+    var RUN_TYPES = ['Run', 'TrailRun', 'VirtualRun', 'Treadmill', 'IndoorRun'];
+    var runs = activities.filter(function (a) {
+      return RUN_TYPES.indexOf(a.type) !== -1 || RUN_TYPES.indexOf(a.sport_type) !== -1;
+    });
+    sk('pacer_last_autosync', String(Date.now()));
+    sk('pacer_strava_sync_error', '');
+    if (!runs.length) return {
+      newRuns: [],
+      total: 0
+    };
+    var existing = loadRuns();
+    var existingIds = new Set((existing.runs || []).map(function (r) {
+      return r.stravaId;
+    }).filter(Boolean));
+    var newOnes = runs.filter(function (r) {
+      return !existingIds.has(r.id);
+    });
+    var formatted = runs.map(function (r) {
+      var distKm = Math.round(r.distance / 100) / 10;
+      return {
+        name: r.name || 'Run',
+        label: 'Run',
+        distKm: distKm,
+        dist: distKm + 'km',
+        mins: Math.round(r.moving_time / 60),
+        t: fmtTime(r.moving_time),
+        pace: r.average_speed > 0 ? fmtPace(r.average_speed) : null,
+        paceNum: r.average_speed > 0 ? Math.round(1000 / r.average_speed) : null,
+        heartRate: r.average_heartrate ? Math.round(r.average_heartrate) : null,
+        maxHR: r.max_heartrate ? Math.round(r.max_heartrate) : null,
+        elevation: r.total_elevation_gain ? Math.round(r.total_elevation_gain) : 0,
+        feel: 'good',
+        ok: true,
+        date: r.start_date && r.start_date.split('T')[0],
+        startTime: r.start_date_local,
+        stravaId: r.id,
+        type: r.workout_type === 3 ? 'race' : r.workout_type === 2 ? 'long' : r.workout_type === 1 ? 'intervals' : 'easy',
+        name2: r.name
+      };
+    });
+    var s = mergeStravaRuns(formatted);
+
+    // Run history analysis after sync
+    if (formatted.length >= 3) analyzeAndCacheRunHistory(formatted);
+    return {
+      newRuns: newOnes.map(function (r) {
+        return formatted.find(function (f) {
+          return f.stravaId === r.id;
+        });
+      }).filter(Boolean),
+      latestRun: formatted[0],
+      store: s,
+      total: formatted.length
+    };
+  } catch (e) {
+    sk('pacer_strava_sync_error', e.message);
+    return null;
+  }
+}
+
+// --- RUN HISTORY ANALYSIS ---
+var RUN_ANALYSIS_KEY = 'p_run_analysis';
 function analyzeAndCacheRunHistory(runs) {
   if (!runs || runs.length < 2) return;
   var analysis = {};
@@ -2603,10 +2955,13 @@ function CoachCard(props) {
   var city=props.city, planType=props.planType, runnerType=props.runnerType;
   var weeklyKm=props.weeklyKm||0, goalKm=props.goalKm||40, streak=props.streak||0;
   var weather=props.weather, name=props.name||'Runner';
+  var appMode=props.appMode||'training';
   var today=todayStr();
   var todayLog=loadLog()[today]||{};
   var runs=loadRuns().runs||[];
   var todayRun=runs.find(function(r){return r.date===today;});
+  var aiPlanData=loadAIPlan();
+  var swapNotes=(aiPlanData&&aiPlanData.swapNotes)||[];
   var sess=getSession(planType);
   var hr=new Date().getHours();
   var wd=weather||getStaticWeather(city);
@@ -2618,6 +2973,10 @@ function CoachCard(props) {
   var tier=getUserTier(runnerType);
   var win=calcWindows(wd);
   var cardState=getCard1State(todayRun,isRestDay,hr,win);
+  if(appMode==='simple') {
+    // simple mode: only window-based states
+    cardState=getWindowState(hr,win);
+  }
   var basePace=getBasePace(runnerType,sess[0]);
   var adjPace=getAdjustedPace(basePace,therm);
   var tomorrow=getTomorrowSession(planType);
@@ -2697,22 +3056,66 @@ function CoachCard(props) {
     }
 
     if(cardState==='REST_DAY') {
-      var restWhy=tier==='tier_1'?'Running today slows down the repair happening now':
-                  tier==='tier_3'?weeklyKm+'km this week \u00b7 lay out your gear tonight':
-                  'Adaptation from this week happens during rest, not training';
-      var restWhat=tier==='tier_1'?'A short walk is fine if you want to move':
-                   tier==='tier_3'?'Mobility or foam rolling fine \u00b7 no cardio':
-                   'Light walking or stretching is fine';
-      var restTmr=tier==='tier_1'?'Tomorrow: '+tmrName:
-                  tier==='tier_3'?tmrName+' \u00b7 '+(m?fmtWin(m):'morning')+' \u00b7 target '+tmrAdj:
-                  tmrName+' \u00b7 '+(m?fmtWin(m):'morning')+' \u00b7 '+tmrVerd;
+      var dow=new Date().getDay();
+      if(appMode==='rhythm') {
+        // rhythm mode: simpler rest day rows
+        var tmrDOWr=new Date(Date.now()+86400000).getDay();
+        var DNMr=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        var tmrDNr=DNMr[tmrDOWr];
+        var aiPDr=loadAIPlan();
+        var tmrPSr=(aiPDr&&aiPDr.sessions||[]).find(function(s){return s.day===tmrDNr;});
+        var tmrNameR=tmrPSr?tmrPSr.name:'Easy run';
+        var tipR=dow===1?'Good day to walk and eat well':
+                 dow===3?'Light stretch or a short walk is enough':
+                 dow===5?'Sleep early tonight -- tomorrow is a run day':
+                 'Move gently today if you want. No pressure.';
+        return [
+          {label:'Today',value:'Not a run day -- rest up',hi:true},
+          {label:'Tomorrow',value:tmrNameR,hi:false},
+          {label:'Today tip',value:tipR,hi:false}
+        ];
+      }
+      // training mode: full physiological rows
+      var todayFact=dow===1?'Glycogen stores refilling from yesterday effort':
+                    dow===3?'Muscle fibre repair peaks 36-48h after your last run':
+                    dow===5?'Aerobic adaptations consolidate during rest, not training':
+                    'Your muscles are rebuilding. This is when fitness actually improves.';
+      var planSessions=(aiPlanData&&aiPlanData.sessions)||[];
+      var tmrDOW=new Date(Date.now()+86400000).getDay();
+      var DAYNAMES2=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var tmrDayName=DAYNAMES2[tmrDOW];
+      var tmrPlanSess=planSessions.find(function(s){return s.day===tmrDayName;});
+      var tmrSessionName=tmrPlanSess?tmrPlanSess.name:tmrName;
+      var tmrWinStr=(m?fmtWin(m):(e?fmtWin(e):'morning'));
+      var tmrRow=tmrSessionName+' \u00b7 '+tmrWinStr+' \u00b7 '+(m?m.verdict:eVerd);
+      var condNote=hi>34||wd.aqi>100?
+        'Good day to rest -- AQI '+(wd.aqi||80)+' and heat '+hi+'C. Body and air both saying the same thing.':
+        'Good conditions outside but rest is the session today. Tomorrow you use this.';
       return [
-        {label:'Today', value:'Scheduled rest \u00b7 muscles rebuilding', hi:true},
-        {label:'No run', value:restWhat, hi:false},
-        {label:'Tomorrow', value:restTmr, hi:false}
+        {label:'Today', value:todayFact, hi:true},
+        {label:'Tomorrow', value:tmrRow, hi:false},
+        {label:'Conditions', value:condNote, hi:false}
       ];
     }
 
+    // simple mode: override all window states with 3 simple rows
+    if(appMode==='simple') {
+      var verdV=verd.v;
+      var simpleSugg=verdV==='GO RUN'?'30 to 40 minutes is a great run today':
+                     verdV==='GO EASY'?'20 to 30 minutes easy, take it slow':
+                     verdV==='WAIT'?'Evening window might be better today':
+                     'Not a good day to run outside';
+      var simpleCond=verdV==='GO RUN'?'Clear and cool enough -- good morning conditions':
+                     verdV==='GO EASY'?'A bit warm but manageable if you go easy':
+                     verdV==='WAIT'?'It is quite hot and hazy right now':
+                     'Conditions are too harsh for a run today';
+      var simpleWin=m?fmtWin(m):(e?fmtWin(e):'morning');
+      return [
+        {label:'Best window', value:simpleWin+' -- '+(verdV==='GO RUN'||verdV==='GO EASY'?'good today':'check evening'), hi:true},
+        {label:'Today', value:simpleSugg, hi:false},
+        {label:'Conditions', value:simpleCond, hi:false}
+      ];
+    }
     if(cardState==='PRE_MORNING') {
       var winLabel=m?fmtWin(m):'morning';
       var planVal=tier==='tier_1'?sessLabel+' around '+winLabel:
@@ -2906,6 +3309,8 @@ function CoachCard(props) {
       chatMode&&reply&&React.createElement('div',{style:{marginBottom:10}},
         React.createElement('p',{style:{fontSize:13,color:'rgba(255,255,255,.8)',lineHeight:1.7}},reply),
         React.createElement('button',{onClick:function(){setChatMode(false);setReply('');},style:{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'rgba(255,255,255,.2)',padding:0,marginTop:4,fontFamily:C.F}},'Back')),
+      swapNotes&&swapNotes.length>0&&React.createElement('div',{style:{borderLeft:'3px solid #FF9500',paddingLeft:10,marginBottom:10}},
+        React.createElement('p',{style:{fontSize:12,color:'rgba(255,149,0,.9)',lineHeight:1.6}},swapNotes[0])),
       React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
         React.createElement('input',{ref:inputRef,value:msg,onChange:function(e){setMsg(e.target.value);},onKeyDown:function(e){if(e.key==='Enter')ask();},placeholder:'Ask your coach...',style:{flex:1,background:'rgba(255,255,255,.07)',border:'1px solid rgba(255,255,255,.1)',borderRadius:10,padding:'9px 13px',fontSize:12,color:'#fff',outline:'none',fontFamily:C.F}}),
         React.createElement('button',{onClick:ask,disabled:!msg.trim()||asking,style:{width:36,height:36,borderRadius:10,background:msg.trim()&&!asking?C.blue:'rgba(255,255,255,.08)',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:msg.trim()&&!asking?'pointer':'default',flexShrink:0}},
@@ -3116,6 +3521,7 @@ function getRestDayPhysiology(tier) {
 function SessionCard(props) {
   var planType=props.planType, city=props.city, weather=props.weather;
   var runMode=props.runMode||'training', runnerType=props.runnerType||'regular', name=props.name||'Runner';
+  var appMode=props.appMode||'training';
   var sess=getSession(planType);
   var sessType=mapSessType(sess[0]);
   var sessKm=sess[2]||0;
@@ -3163,6 +3569,20 @@ function SessionCard(props) {
   }
 
   var sentence=isRest?'Your body is doing the work right now.':getCollapsedSentence(sessType,verd.v,tier,hi);
+  // Tomorrow preview for rest day
+  var tmrPreviewText=null;
+  if(isRest){
+    var aiPD=loadAIPlan();
+    var tmrDOW2=new Date(Date.now()+86400000).getDay();
+    var DNM=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var tmrDN=DNM[tmrDOW2];
+    var tmrPS=(aiPD&&aiPD.sessions||[]).find(function(s){return s.day===tmrDN;});
+    if(tmrPS&&tmrPS.type!=='rest'){
+      var wins2=calcWindows&&calcWindows(getStaticWeather(city||'Bengaluru'));
+      var tmrWin2=wins2&&wins2.morning?fmtWin(wins2.morning):'morning';
+      tmrPreviewText='Tomorrow: '+tmrPS.name+(tmrPS.km?' \u00b7 '+tmrPS.km+'km':'')+' \u00b7 '+tmrWin2+' window';
+    }
+  }
   var effortLabel=getEffortLabel(sessType,tier);
   var COLS={easy:C.green,recovery:'#60A5FA',long:'#A78BFA',tempo:'#22D3EE',intervals:C.orange,fartlek:'#F59E0B',progression:'#34D399',rest:C.t3};
   var col=COLS[sessType]||C.green;
@@ -3180,7 +3600,8 @@ function SessionCard(props) {
       React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}},
         React.createElement('span',{style:{background:col+'15',border:'1px solid '+col+'30',borderRadius:6,padding:'2px 9px',fontSize:10,fontWeight:700,color:col}},effortLabel),
         lib.format&&React.createElement('span',{style:{background:C.card2,border:'1px solid '+C.b1,borderRadius:6,padding:'2px 8px',fontSize:9,color:C.t3}},lib.format))),
-    React.createElement('p',{style:{fontSize:13,color:isRest?C.t2:C.t1,lineHeight:1.65,marginBottom:10,fontStyle:isRest?'italic':'normal'}},sentence));
+    React.createElement('p',{style:{fontSize:13,color:isRest?C.t2:C.t1,lineHeight:1.65,marginBottom:tmrPreviewText?4:10,fontStyle:isRest?'italic':'normal'}},sentence),
+    isRest&&tmrPreviewText&&React.createElement('p',{style:{fontSize:11,color:C.t3,marginBottom:10,lineHeight:1.5}},tmrPreviewText));
 
   var expandRow=React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}},
     React.createElement('p',{style:{fontSize:11,color:C.t3}},expanded?'Collapse':'Tap to expand'),
@@ -3190,6 +3611,47 @@ function SessionCard(props) {
   if(!expanded) return React.createElement('div',{onClick:toggle,style:{background:C.card,border:'1px solid '+C.b1,borderRadius:16,padding:'14px 16px',marginBottom:14,cursor:'pointer'}},header,expandRow);
 
   // Expanded
+  //    SIMPLE MODE: minimal non-plan card                                 
+  if(appMode==='simple') {
+    var simpleVerd=verd.v;
+    var isGoodDay=simpleVerd==='GO RUN'||simpleVerd==='GO EASY';
+    var simpleTitle=isGoodDay?'Easy run':'Rest today';
+    var simpleSentences=['Get out before it gets warm.','Good morning for a run.',
+      'Conditions are decent -- go enjoy it.','Not too hot yet -- good window.',
+      'Short easy run today. Nothing complicated.'];
+    var simpleSent=isGoodDay?simpleSentences[new Date().getDay()%5]:
+      'Conditions outside are tough today. Good call to skip it.';
+    var simpleCol=isGoodDay?C.green:C.t3;
+    return React.createElement('div',{style:{background:C.card,border:'1px solid '+C.b1,borderRadius:16,padding:'14px 16px',marginBottom:14}},
+      React.createElement('div',{style:{display:'flex',alignItems:'flex-start',gap:10}},
+        React.createElement('div',{style:{width:8,height:8,borderRadius:'50%',background:simpleCol,flexShrink:0,marginTop:5}}),
+        React.createElement('div',null,
+          React.createElement('p',{style:{fontFamily:C.F,fontSize:16,fontWeight:800,color:C.t1,marginBottom:4}},simpleTitle),
+          React.createElement('p',{style:{fontSize:13,color:C.t2,lineHeight:1.65}},simpleSent))));
+  }
+
+  //    RHYTHM MODE: rest day override                                      
+  if(appMode==='rhythm'&&isRest) {
+    var rhythmExpanded=expanded;
+    return React.createElement('div',{style:{background:C.card,border:'1px solid '+C.b1,borderRadius:16,padding:'14px 16px',marginBottom:14}},
+      React.createElement('div',{onClick:toggle,style:{cursor:'pointer'}},
+        React.createElement('div',{style:{display:'flex',alignItems:'flex-start',gap:10,marginBottom:8}},
+          React.createElement('div',{style:{width:8,height:8,borderRadius:'50%',background:C.t3,flexShrink:0,marginTop:5}}),
+          React.createElement('div',null,
+            React.createElement('p',{style:{fontFamily:C.F,fontSize:16,fontWeight:800,color:C.t1,marginBottom:4}},'Easy day today'),
+            React.createElement('p',{style:{fontSize:13,color:C.t2,lineHeight:1.65,marginBottom:tmrPreviewText?4:0}},'Tomorrow is a run day. Today just move how you feel.'),
+            tmrPreviewText&&React.createElement('p',{style:{fontSize:11,color:C.t3,lineHeight:1.5}},tmrPreviewText))),
+        React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}},
+          React.createElement('p',{style:{fontSize:11,color:C.t3}},rhythmExpanded?'Collapse':'Tap to expand'),
+          React.createElement('svg',{width:'12',height:'12',viewBox:'0 0 24 24',fill:'none',stroke:C.t3,strokeWidth:'2',strokeLinecap:'round',style:{transform:rhythmExpanded?'rotate(180deg)':'none',transition:'.2s'}},
+            React.createElement('polyline',{points:'6 9 12 15 18 9'})))),
+      rhythmExpanded&&React.createElement('div',null,
+        React.createElement('div',{style:{height:1,background:C.b1,margin:'8px 0'}}),
+        React.createElement('p',{style:{fontSize:9,fontWeight:700,color:C.t3,letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:8}},'WHY THIS IS A SESSION'),
+        whyLoading?React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},React.createElement(Spin,{size:12,color:C.t3}),React.createElement('p',{style:{fontSize:12,color:C.t3}},'Loading...')):
+        React.createElement('p',{style:{fontSize:13,color:C.t2,lineHeight:1.7}},whyText||'Rest is part of the training plan. Your body adapts during recovery, not during the run.')));
+  }
+
   return React.createElement('div',{style:{background:C.card,border:'1px solid '+C.b1,borderRadius:16,padding:'14px 16px',marginBottom:14}},
     React.createElement('div',{onClick:toggle,style:{cursor:'pointer'}},header,expandRow),
     divider,
@@ -3358,19 +3820,8 @@ function WeatherCard(props) {
   var DAY_ABBR=['SUN','MON','TUE','WED','THU','FRI','SAT'];
   var todayIdx=new Date().getDay();
 
-  // -- REST DAY: minimal card --
-  if(cardState==='REST_DAY') {
-    return React.createElement('div',{style:{background:'#141824',borderRadius:20,overflow:'hidden',marginBottom:12}},
-      React.createElement('div',{style:{height:3,background:vt.bar}}),
-      React.createElement('div',{style:{padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
-        React.createElement('div',null,
-          React.createElement('p',{style:{fontSize:11,fontWeight:700,letterSpacing:'2.5px',color:'#444',textTransform:'uppercase',marginBottom:4}},city),
-          React.createElement('p',{style:{fontSize:12,fontWeight:300,color:'#666'}},"Today's conditions -- no run scheduled.")),
-        React.createElement('div',{style:{textAlign:'right'}},
-          React.createElement('p',{style:{fontSize:15,fontWeight:700,color:'#fff'}},(wd.temp||30)+'\u00b0C'),
-          React.createElement('p',{style:{fontSize:11,color:'#444'}},isLive?'Live':'Seasonal'),
-          React.createElement('p',{style:{fontSize:11,color:'#444'}},'AQI '+wd.aqi))));
-  }
+  // -- REST DAY: full card, same as run day but with rest label --
+  // Falls through to main render below with isRestDay flag used for city label
 
   var subtitle=getVerdictSubtitle(verd.v);
 
@@ -3391,7 +3842,7 @@ function WeatherCard(props) {
     React.createElement('div',{style:{padding:'16px 18px 0',position:'relative',zIndex:1}},
       // City row
       React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}},
-        React.createElement('p',{style:{fontSize:11,fontWeight:700,letterSpacing:'2.5px',color:'#444',textTransform:'uppercase'}},city),
+        React.createElement('p',{style:{fontSize:11,fontWeight:700,letterSpacing:'2.5px',color:'#444',textTransform:'uppercase'}},isRestDay?'Today conditions - rest day':city),
         isLive&&React.createElement('div',{style:{display:'flex',alignItems:'center',gap:5}},
           React.createElement('div',{style:{width:5,height:5,borderRadius:'50%',background:vt.text,animation:'livePulse 2s ease-in-out infinite'}}),
           React.createElement('span',{style:{fontSize:10,fontWeight:700,color:vt.text,letterSpacing:'1px'}},'LIVE'))),
@@ -3787,8 +4238,8 @@ function FuelCard(props) {
         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}},
           React.createElement('p',{style:{fontSize:10,fontWeight:700,letterSpacing:'2px',textTransform:'uppercase',color:C.t3}},'FOOD TODAY'),
           React.createElement('p',{style:{fontSize:11,color:C.t3}},timeStr)),
-        React.createElement('p',{style:{fontSize:13,color:C.t2,marginBottom:4}},'No run today -- eat well for recovery.'),
-        React.createElement('p',{style:{fontSize:11,color:C.t3}},'Normal balanced meals. Focus on protein and carbohydrates.'),
+        React.createElement('p',{style:{fontSize:13,color:C.t2,marginBottom:6,fontWeight:600}},'No run today -- eat well for recovery.'),
+        React.createElement('p',{style:{fontSize:12,color:C.t2,lineHeight:1.65,marginBottom:4}},'Protein + carbs within the next meal window helps muscle repair. Dal rice, curd rice, or paneer with roti all work.'),
         !expanded&&React.createElement('div',{style:{marginTop:8,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}},
           React.createElement('p',{style:{fontSize:11,color:C.t3}},'Tap for food chat'),
           React.createElement('svg',{width:'10',height:'10',viewBox:'0 0 24 24',fill:'none',stroke:C.t3,strokeWidth:'2.5',strokeLinecap:'round'},React.createElement('polyline',{points:'6 9 12 15 18 9'})))),
@@ -4015,6 +4466,10 @@ function HomeScreen(props) {
   var recentRuns = runs.slice(0, 5);
   var aiPlanData = loadAIPlan();
   var appState = getAppState(runs, aiPlanData, userPrefs, liveWeather);
+  var runMode = userPrefs.runMode || 'training';
+  var appMode = (runnerType==='beginner'||runMode==='casual') ? 'simple' :
+    ((runnerType==='regular'||runnerType==='serious') && runMode==='training' && aiPlanData) ? 'training' :
+    'rhythm';
   useEffect(function () {
     setWeatherLoading(true);
     fetchLiveWeather(city).then(function (d) {
@@ -4139,14 +4594,16 @@ function HomeScreen(props) {
     goalKm: goalKm,
     streak: streak,
     weather: liveWeather,
-    runMode: userPrefs.runMode || 'training'
+    runMode: userPrefs.runMode || 'training',
+    appMode: appMode
   }), /*#__PURE__*/React.createElement(SessionCard, {
     planType: planType,
     city: city,
     weather: liveWeather,
     runMode: userPrefs.runMode || 'training',
     runnerType: runnerType,
-    name: name
+    name: name,
+    appMode: appMode
   }), /*#__PURE__*/React.createElement(WeatherCard, {
     city: city,
     runMode: (userPrefs && userPrefs.runMode) || "training",
@@ -5260,6 +5717,9 @@ function TrainScreen(props) {
         heatIndex:hi2,
         aqi:wd.aqi||80
       });
+      // Apply weather adjustments to schedule
+      var weatherResult=applyWeatherToSchedule(struct.schedule,forecast,city);
+      struct=Object.assign({},struct,{schedule:weatherResult.schedule,swapNotes:weatherResult.swapNotes});
       var narrative = await generateWeeklyPlan(struct,userPrefs,runs.slice(0,5));
       // Parse Claude output into per-day descriptions
       var days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -5402,8 +5862,8 @@ function TrainScreen(props) {
       }))),
 
     // Modals
-    showLog&&React.createElement(LogRunModal,{onClose:function(){setShowLog(false);},onSaved:function(s,e){handleSaved(s,e);setShowLog(false);}}),
-    checkinOpen&&checkinEntry&&React.createElement(PostRunCheckinModal,{entry:checkinEntry,onClose:function(){setCheckinOpen(false);},onDone:function(s){setStoreData(s);setCheckinOpen(false);}})
+    React.createElement(LogRunSheet,{open:showLog,onClose:function(){setShowLog(false);},city:city,weather:liveWeather,onSaved:function(s,e){handleSaved(s,e);setShowLog(false);}}),
+    React.createElement(PostRunCheckin,{open:checkinOpen,entry:checkinEntry,city:city,weather:liveWeather,onDone:function(s){setStoreData(s);setCheckinOpen(false);}})
   );
 }
 
@@ -7165,6 +7625,8 @@ function ProfileScreen(props) {
     if (toast) toast(msg);
   }
   var [section, setSection] = useState('main');
+  var [feedbackText, setFeedbackText] = useState('');
+  var [feedbackText, setFeedbackText] = useState('');
   var [showClubs, setShowClubs] = useState(false);
   var [stravaConnected, setStravaConnected] = useState(!!gk('pacer_strava_token'));
   var profileRuns = (loadRuns().runs||[]);
@@ -7334,62 +7796,20 @@ function ProfileScreen(props) {
     userPrefs: userPrefs
   }), /*#__PURE__*/React.createElement(PlanARunCard, {
     userPrefs: userPrefs
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: '1px solid ' + C.b1,
-      borderRadius: 14,
-      marginBottom: 14,
-      overflow: 'hidden'
-    }
-  }, [['settings', 'Settings'], ['strava', 'Strava & Integrations'], ['about', 'About PACER']].map(function (pair, i, arr) {
-    return /*#__PURE__*/React.createElement("button", {
-      key: pair[0],
-      onClick: function () {
-        setSection(section === pair[0] ? 'main' : pair[0]);
-      },
-      style: {
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '14px 18px',
-        background: 'none',
-        border: 'none',
-        borderBottom: i < arr.length - 1 ? '1px solid ' + C.b1 : 'none',
-        cursor: 'pointer',
-        textAlign: 'left'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 14,
-        fontWeight: 500,
-        color: C.t1
-      }
-    }, pair[1]), /*#__PURE__*/React.createElement("svg", {
-      width: "14",
-      height: "14",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: C.t3,
-      strokeWidth: "2",
-      strokeLinecap: "round",
-      style: {
-        transform: section === pair[0] ? 'rotate(90deg)' : 'none',
-        transition: '.2s'
-      }
-    }, /*#__PURE__*/React.createElement("polyline", {
-      points: "9 18 15 12 9 6"
-    })));
-  })), section === 'settings' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: '1px solid ' + C.b1,
-      borderRadius: 14,
-      padding: '18px',
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement(Lbl, {
+  }), /*#__PURE__*//*#__PURE__*/React.createElement("div", {style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,marginBottom:14,overflow:'hidden'}},
+    /*#__PURE__*/React.createElement("button", {
+      onClick:function(){setSection(section==='settings'?'main':'settings');},
+      style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',
+        padding:'14px 18px',background:'none',border:'none',
+        borderBottom:'1px solid '+C.b1,cursor:'pointer',fontFamily:C.F,textAlign:'left'}
+    },
+    /*#__PURE__*/React.createElement("span",{style:{fontSize:14,fontWeight:500,color:C.t1}},'Settings'),
+    /*#__PURE__*/React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",
+      stroke:C.t3,strokeWidth:"2",strokeLinecap:"round",
+      style:{transform:section==='settings'?'rotate(90deg)':'none',transition:'.2s'}
+    },/*#__PURE__*/React.createElement("polyline",{points:"9 18 15 12 9 6"}))),
+    section==='settings'&&/*#__PURE__*/React.createElement("div",{style:{padding:'16px 18px',borderBottom:'1px solid '+C.b1}},
+      /*#__PURE__*/React.createElement(Lbl, {
     style: {
       marginBottom: 8
     }
@@ -7524,14 +7944,7 @@ function ProfileScreen(props) {
     style: {
       marginBottom: 8
     }
-  }, "Claude API key"), /*#__PURE__*/React.createElement(SaveableField, {
-    label: "Claude API key",
-    storageKey: "pacer_claude_key",
-    placeholder: "sk-ant-api03-...",
-    hint: "Powers AI coaching. Never sent to our servers.",
-    hintLink: "console.anthropic.com",
-    toast: showToast
-  }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: onSignOut,
     style: {
       width: '100%',
@@ -7544,15 +7957,21 @@ function ProfileScreen(props) {
       color: C.red,
       cursor: 'pointer'
     }
-  }, "Sign out")), section === 'strava' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: '1px solid ' + C.b1,
-      borderRadius: 14,
-      padding: '18px',
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, "Sign out"))
+    ),
+    /*#__PURE__*/React.createElement("button", {
+      onClick:function(){setSection(section==='strava'?'main':'strava');},
+      style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',
+        padding:'14px 18px',background:'none',border:'none',
+        borderBottom:'1px solid '+C.b1,cursor:'pointer',fontFamily:C.F,textAlign:'left'}
+    },
+    /*#__PURE__*/React.createElement("span",{style:{fontSize:14,fontWeight:500,color:C.t1}},'Strava & Integrations'),
+    /*#__PURE__*/React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",
+      stroke:C.t3,strokeWidth:"2",strokeLinecap:"round",
+      style:{transform:section==='strava'?'rotate(90deg)':'none',transition:'.2s'}
+    },/*#__PURE__*/React.createElement("polyline",{points:"9 18 15 12 9 6"}))),
+    section==='strava'&&/*#__PURE__*/React.createElement("div",{style:{padding:'16px 18px',borderBottom:'1px solid '+C.b1}},
+      /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -7694,15 +8113,21 @@ function ProfileScreen(props) {
       marginTop: 4,
       lineHeight: 1.6
     }
-  }, "Using Open-Meteo -- no key required. Data from CAMS European air quality services, updated hourly.")))), section === 'about' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.card,
-      border: '1px solid ' + C.b1,
-      borderRadius: 14,
-      padding: '18px',
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, "Using Open-Meteo -- no key required. Data from CAMS European air quality services, updated hourly."))))
+    ),
+    /*#__PURE__*/React.createElement("button", {
+      onClick:function(){setSection(section==='about'?'main':'about');},
+      style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',
+        padding:'14px 18px',background:'none',border:'none',
+        borderBottom:'1px solid '+C.b1,cursor:'pointer',fontFamily:C.F,textAlign:'left'}
+    },
+    /*#__PURE__*/React.createElement("span",{style:{fontSize:14,fontWeight:500,color:C.t1}},'About PACER'),
+    /*#__PURE__*/React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",
+      stroke:C.t3,strokeWidth:"2",strokeLinecap:"round",
+      style:{transform:section==='about'?'rotate(90deg)':'none',transition:'.2s'}
+    },/*#__PURE__*/React.createElement("polyline",{points:"9 18 15 12 9 6"}))),
+    section==='about'&&/*#__PURE__*/React.createElement("div",{style:{padding:'16px 18px',borderBottom:'1px solid '+C.b1}},
+      /*#__PURE__*/React.createElement("p", {
     style: {
       fontFamily: C.F,
       fontSize: 18,
@@ -7746,7 +8171,43 @@ function ProfileScreen(props) {
         color: C.t3
       }
     }, pair[1])));
-  }))));
+  }
+    ),
+    /*#__PURE__*/React.createElement("button", {
+      onClick:function(){setSection(section==='feedback'?'main':'feedback');},
+      style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',
+        padding:'14px 18px',background:'none',border:'none',
+        borderBottom:'none',cursor:'pointer',fontFamily:C.F,textAlign:'left'}
+    },
+    /*#__PURE__*/React.createElement("span",{style:{fontSize:14,fontWeight:500,color:C.t1}},'Share feedback'),
+    /*#__PURE__*/React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",
+      stroke:C.t3,strokeWidth:"2",strokeLinecap:"round",
+      style:{transform:section==='feedback'?'rotate(90deg)':'none',transition:'.2s'}
+    },/*#__PURE__*/React.createElement("polyline",{points:"9 18 15 12 9 6"}))),
+    section==='feedback'&&/*#__PURE__*/React.createElement("div",{style:{padding:'16px 18px'}},
+      /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("textarea", {
+        value: feedbackText, onChange: function(e){setFeedbackText(e.target.value);},
+        placeholder: "What would make PACER better for you?",
+        rows: 4,
+        style: {width:'100%',background:C.card2,border:'1px solid '+C.b1,borderRadius:12,
+          padding:'12px 14px',fontSize:14,color:C.t1,outline:'none',fontFamily:C.F,
+          resize:'vertical',marginBottom:12,boxSizing:'border-box',display:'block'}
+      }),
+      /*#__PURE__*/React.createElement(Btn, {onClick: async function(){
+        if(!feedbackText.trim())return;
+        try{
+          var sb=getSupabase();
+          if(sb){await sb.from('feedback').insert({
+            user_name:userPrefs.name||'',city:userPrefs.city||'',
+            runner_type:userPrefs.runnerType||'',feedback:feedbackText.trim(),
+            app_version:'beta-v1',created_at:new Date().toISOString()
+          });}
+          setFeedbackText('');
+          showToast('Feedback sent. Thank you.');
+        }catch(e){}
+      }}, "Submit"))
+    ))));
 }
 
 // --- FOUNDER DATA ---
