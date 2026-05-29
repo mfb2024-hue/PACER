@@ -6050,6 +6050,7 @@ function TrainScreen(props) {
         return {
           day:day,
           type:sess.type,
+          name:sess.name||sess.type||'Easy run',
           km:sess.km,
           zone:sess.zone,
           pace:sess.pacePlain,
@@ -6155,7 +6156,7 @@ function TrainScreen(props) {
                 React.createElement('p',{style:{fontSize:10,fontWeight:800,color:col}},sess.type==='rest'?'R':sess.km+'k')),
               React.createElement('div',{style:{flex:1}},
                 React.createElement('p',{style:{fontSize:13,fontWeight:700,color:C.t1,marginBottom:1}},
-                  sess.type==='rest'?'Rest day':sess.type==='recovery'?'Recovery jog':(sess.type||'Easy')+(sess.km>0?' -- '+sess.km+'km':'')),
+                  sess.type==='rest'?'Rest day':sess.type==='recovery'?'Recovery jog':(sess.name||sess.type||'Easy run')+(sess.km>0?'   '+sess.km+'km':'')),
                 sess.pace&&sess.type!=='rest'&&React.createElement('p',{style:{fontSize:11,color:C.t2}},sess.pace+(therm>0?' -- +'+therm+'s heat':''))),
               isToday&&React.createElement('span',{style:{background:C.blue,color:'#fff',borderRadius:6,padding:'2px 7px',fontSize:9,fontWeight:700}},'TODAY'),
               React.createElement('svg',{width:'12',height:'12',viewBox:'0 0 24 24',fill:'none',stroke:C.t3,strokeWidth:'2',strokeLinecap:'round',style:{transform:isExp?'rotate(180deg)':'none',transition:'.2s',flexShrink:0}},
@@ -8415,14 +8416,21 @@ function ProfileScreen(props) {
     onClick: async function () {
       try {
         var r = await fetch('/api/strava-auth-url');
+        if(!r.ok) {
+          var errText = await r.text();
+          alert('Strava function error (' + r.status + '). Check STRAVA_CLIENT_ID in Vercel env vars. Detail: ' + errText.substring(0,150));
+          return;
+        }
         var data = await r.json();
-        if(data.url) {
+        if(data.url && data.url.indexOf('strava.com') > -1) {
           window.location.href = data.url;
+        } else if(data.error) {
+          alert('Strava config error: ' + data.error);
         } else {
-          alert('Strava connect failed: ' + (data.error || 'No URL returned'));
+          alert('Unexpected response: ' + JSON.stringify(data).substring(0,200));
         }
       } catch(e) {
-        alert('Strava connect error: ' + e.message);
+        alert('Strava error: ' + e.message + '. Check STRAVA_CLIENT_ID is set in Vercel env vars.');
       }
     },
     style: {
