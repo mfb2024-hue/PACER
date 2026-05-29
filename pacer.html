@@ -32,7 +32,7 @@ input,button,select,textarea{font-family:inherit}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100dvh;background:#0F172A"><svg width="72" height="72" viewBox="0 0 100 100" fill="none"><text x="8" y="82" font-family="sans-serif" font-size="90" font-weight="900" fill="white" letter-spacing="-4">P</text></svg></div></div>
 <script>
   window.PACER_CONFIG = {
     supabaseUrl: '@@SUPABASE_URL@@',
@@ -44,6 +44,11 @@ input,button,select,textarea{font-family:inherit}
 (function(){var o=window.fetch;window.fetch=function(u,p){if(typeof u==='string'&&u.includes('anthropic.com')){p=p||{};p.headers=Object.assign({},p.headers,{'x-api-key':localStorage.getItem('pacer_claude_key')||'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'});}return o.apply(this,arguments);};})();
 </script>
 <script>
+window.onerror = function(msg, src, line, col, err) {
+  var d = document.getElementById('root');
+  if(d) d.innerHTML = '<div style="padding:24px;font-family:sans-serif;background:#0F172A;color:#fff;min-height:100dvh"><p style="font-size:13px;color:#f87171;font-weight:700;margin-bottom:8px">PACER startup error</p><p style="font-size:11px;color:#94a3b8;word-break:break-all">' + (msg||'') + '<br>Line ' + line + '</p></div>';
+  return false;
+};
 const {
   useState,
   useEffect,
