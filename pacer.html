@@ -8659,6 +8659,7 @@ function FounderClubPage(props) {
   var [caption, setCaption] = useState('');
   var [posting, setPosting] = useState(false);
   var [showLogPast, setShowLogPast] = useState(false);
+  var [showClubSetup, setShowClubSetup] = useState(false);
 
   useEffect(function(){
     var alive=true;
@@ -8716,7 +8717,11 @@ function FounderClubPage(props) {
       React.createElement("div",{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}},
         React.createElement("div",null,
           React.createElement("p",{style:{fontSize:11,color:'rgba(255,255,255,.5)',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',marginBottom:4}},"Your club"),
-          React.createElement("h1",{style:{fontFamily:C.F,fontSize:24,fontWeight:900,color:'#fff',letterSpacing:'-.6px',lineHeight:1.1}},club.name)
+          React.createElement("h1",{style:{fontFamily:C.F,fontSize:24,fontWeight:900,color:'#fff',letterSpacing:'-.6px',lineHeight:1.1}},club.name),
+          React.createElement("button",{
+            onClick:function(){setShowClubSetup(true);},
+            style:{marginTop:8,background:'rgba(255,255,255,.15)',color:'rgba(255,255,255,.8)',border:'1px solid rgba(255,255,255,.2)',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:C.F}
+          },"Edit club details")
         ),
         club.join_code&&React.createElement("div",{style:{background:'rgba(255,255,255,.12)',borderRadius:10,padding:'8px 12px',textAlign:'center'}},
           React.createElement("p",{style:{fontSize:10,color:'rgba(255,255,255,.5)',fontWeight:600,letterSpacing:'1px',marginBottom:2}},"JOIN CODE"),
@@ -8832,6 +8837,15 @@ function FounderClubPage(props) {
       toast:toast,
       onSaved:function(run){
         setRuns(function(prev){return [run].concat(prev);});
+      }
+    }),
+    React.createElement(ClubSetupSheet, {
+      open:showClubSetup,
+      onClose:function(){setShowClubSetup(false);},
+      club:club,
+      toast:toast,
+      onSaved:function(updates){
+        setClub(function(prev){ return Object.assign({},prev,updates); });
       }
     })
   );
@@ -9085,8 +9099,8 @@ function FounderHomeScreen(props) {
   var todayISO = new Date().toISOString().split('T')[0];
   var upcoming = clubRuns.filter(function (r) { return (r.rawDate || '') >= todayISO; });
   var nextRun = upcoming.length ? upcoming[0] : null;
-  // Club needs setup if name ends with "Run Club" (auto-generated) and has no description
-  var needsSetup = club && (!club.description) && (club.name||'').match(/['s]+ Run Club$/);
+  // Club needs setup if no club exists yet, or club has no description
+  var needsSetup = !loadingClub && (!club || !club.description);
   async function approve(id) {
     var ok = await approveMember(id);
     if (ok) {
@@ -9235,20 +9249,25 @@ function FounderHomeScreen(props) {
       color: C.navy
     }
   }, /*#__PURE__*/React.createElement(IcoArrow, null))))), needsSetup && !loadingClub && /*#__PURE__*/React.createElement("div", {
-    style:{background:'linear-gradient(135deg,'+C.nFg+',#e0e7ff)',border:'2px solid '+C.navy,borderRadius:14,padding:'16px',marginBottom:12}
+    style:{background:'linear-gradient(135deg,#f0f4ff,#e8eeff)',border:'2px dashed '+C.navy+'55',borderRadius:16,padding:'24px 20px',marginBottom:16,textAlign:'center'}
   },
-    React.createElement("div",{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}},
-      React.createElement("div",null,
-        React.createElement("p",{style:{fontFamily:C.F,fontSize:15,fontWeight:800,color:C.navy,marginBottom:3}},"Set up your club first"),
-        React.createElement("p",{style:{fontSize:12,color:C.t2,lineHeight:1.5}},"Add your club name, area, and vibe so members know what they're joining.")
-      ),
-      React.createElement("span",{style:{fontSize:20}},"-")
+    React.createElement("div",{style:{width:56,height:56,borderRadius:'50%',background:C.nFg,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}},
+      React.createElement("svg",{width:"26",height:"26",viewBox:"0 0 24 24",fill:"none",stroke:C.navy,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"},
+        React.createElement("path",{d:"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"}),
+        React.createElement("circle",{cx:"9",cy:"7",r:"4"}),
+        React.createElement("path",{d:"M23 21v-2a4 4 0 0 0-3-3.87"}),
+        React.createElement("path",{d:"M16 3.13a4 4 0 0 1 0 7.75"})
+      )
     ),
+    React.createElement("p",{style:{fontFamily:C.F,fontSize:19,fontWeight:800,color:C.t1,letterSpacing:'-.4px',marginBottom:8}},"Add your run club"),
+    React.createElement("p",{style:{fontSize:13,color:C.t2,lineHeight:1.6,marginBottom:20,maxWidth:240,margin:'0 auto 20px'}},"Set your club name, area, vibe and schedule so members know what they're joining."),
     React.createElement("button",{
       onClick:function(){setShowSetup(true);},
-      style:{width:'100%',background:C.navy,color:'#fff',border:'none',borderRadius:10,padding:'11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:C.F}
+      style:{background:C.navy,color:'#fff',border:'none',borderRadius:12,padding:'13px',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:C.F,width:'100%'}
     },"Set up my club ->")
   ),
+
+  
 
   /*#__PURE__*/React.createElement("div", {style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'space-between'}},
     /*#__PURE__*/React.createElement("div", null,
