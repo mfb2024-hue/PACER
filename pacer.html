@@ -4153,14 +4153,8 @@ function WeatherCard(props) {
           React.createElement('div',{style:{width:5,height:5,borderRadius:'50%',background:vt.text,animation:'livePulse 2s ease-in-out infinite'}}),
           React.createElement('span',{style:{fontSize:10,fontWeight:700,color:vt.text,letterSpacing:'1px'}},'LIVE'))),
 
-      // TIER 1: simplified collapsed
-      tier==='tier_1'
-      ? React.createElement('div',{style:{marginBottom:14}},
-          React.createElement('div',{style:{height:40,width:40,borderRadius:10,background:vt.bg,border:'1px solid '+vt.border,marginBottom:10}}),
-          React.createElement('p',{style:{fontSize:14,fontWeight:300,color:'#888',lineHeight:1.6}},conditionsPlainEnglish&&conditionsPlainEnglish(hi,wd.aqi)||subtitle))
-
-      // TIER 2/3: full collapsed
-      : React.createElement('div',null,
+      // ALL TIERS: full collapsed card   same layout, subtitle adapts
+      React.createElement('div',null,
           // Verdict + Heat Index row
           React.createElement('div',{style:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}},
             React.createElement('div',null,
@@ -4226,13 +4220,13 @@ function WeatherCard(props) {
           React.createElement('div',{style:{width:5,height:5,borderRadius:'50%',background:vt.text,animation:'livePulse 2s ease-in-out infinite'}}),
           React.createElement('span',{style:{fontSize:10,fontWeight:700,color:vt.text,letterSpacing:'1px'}},'LIVE'))),
       // Verdict row (tier 2/3 only)
-      tier!=='tier_1'&&React.createElement('div',{style:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}},
+      React.createElement('div',{style:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}},
         React.createElement('p',{style:{fontSize:38,fontWeight:900,letterSpacing:'-2px',lineHeight:1,color:vt.text}},verd.v),
         React.createElement('div',{style:{background:vt.bg,border:'1px solid '+vt.border,borderRadius:12,padding:'8px 14px',textAlign:'center',flexShrink:0,marginLeft:12}},
           React.createElement('p',{style:{fontSize:20,fontWeight:800,color:'#fff',lineHeight:1}},hi),
           React.createElement('p',{style:{fontSize:9,fontWeight:700,letterSpacing:'1.5px',color:vt.text,textTransform:'uppercase',marginTop:3}},'HEAT INDEX'))),
       // Stats grid (tier 2/3)
-      tier!=='tier_1'&&React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:7,marginBottom:2}},
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:7,marginBottom:2}},
         React.createElement('div',{style:{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',borderRadius:11,padding:'9px 6px',textAlign:'center'}},React.createElement('p',{style:{fontSize:15,fontWeight:700,color:vt.aqi}},(wd.aqi||80)),React.createElement('p',{style:{fontSize:9,fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',color:'#444',marginTop:3}},'AQI')),
         React.createElement('div',{style:{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',borderRadius:11,padding:'9px 6px',textAlign:'center'}},React.createElement('p',{style:{fontSize:15,fontWeight:700,color:'#fff'}},(wd.humidity||70)+'%'),React.createElement('p',{style:{fontSize:9,fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',color:'#444',marginTop:3}},'HUMID')),
         React.createElement('div',{style:{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',borderRadius:11,padding:'9px 6px',textAlign:'center'}},React.createElement('p',{style:{fontSize:15,fontWeight:700,color:'#fff'}},(wd.temp||32)+'\u00b0'),React.createElement('p',{style:{fontSize:9,fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',color:'#444',marginTop:3}},'TEMP')),
@@ -4259,8 +4253,7 @@ function WeatherCard(props) {
         React.createElement('p',{style:{fontSize:9,fontWeight:700,letterSpacing:'2px',textTransform:'uppercase',color:'#444',marginBottom:5}},'CONDITIONS WINDOW'),
         React.createElement('p',{style:{fontSize:13,fontWeight:600,color:'#ccc'}},getWindowText(verd.v,tier))),
       // 5-day forecast (tier 2/3 only)
-      tier!=='tier_1'
-      ?React.createElement('div',{style:{marginBottom:14}},
+      React.createElement('div',{style:{marginBottom:14}},
           React.createElement('p',{style:{fontSize:9,fontWeight:700,letterSpacing:'2px',textTransform:'uppercase',color:'#333',marginBottom:8}},'5-DAY OUTLOOK'),
           React.createElement('div',{style:{display:'flex',gap:6}},
             forecast.slice(0,5).map(function(fc,i){
@@ -4269,12 +4262,11 @@ function WeatherCard(props) {
               return React.createElement('div',{key:i,style:{flex:1,background:fvt.text+'26',border:isToday?'1px solid '+fvt.border:'1px solid transparent',borderRadius:9,padding:'7px 4px',textAlign:'center'}},
                 React.createElement('p',{style:{fontSize:9,color:'#555',marginBottom:3}},DAY_ABBR[(todayIdx+1+i)%7]),
                 React.createElement('p',{style:{fontSize:10,fontWeight:isToday?800:600,color:fvt.text}},fc.verdict.replace('GO RUN','GO').replace('GO EASY','EASY')));
-            })))
-      :React.createElement('p',{style:{fontSize:12,color:'#666',marginBottom:14}},(function(){var next=forecast[0];if(!next)return 'Check tomorrow.';var nv=next.verdict;var better=nv==='GO RUN'||nv==='GO';var worse=nv==='REST';return 'Tomorrow looks '+(better?'better.':(worse?'worse.':'similar.'));}())))),
+            })))),
 
     // Collapse hint
     React.createElement('div',{style:{borderTop:'1px solid rgba(255,255,255,.05)',padding:'9px 18px',textAlign:'center',cursor:'pointer',position:'relative',zIndex:1},onClick:function(){setExpanded(false);}},
-      React.createElement('p',{style:{fontSize:10,fontWeight:600,color:'#2a2a2a'}},'Tap to collapse \u25b2')));
+      React.createElement('p',{style:{fontSize:10,fontWeight:600,color:'#2a2a2a'}},'Tap to collapse \u25b2'))));
 }
 
 
@@ -4299,6 +4291,294 @@ function getSupabase() {
   } catch(e) {}
   return _supabaseClient;
 }
+
+// ============================================================
+// CLUB BACKEND HELPERS (Supabase) - Phase 1 + 3
+// ============================================================
+
+
+// Normalize a Supabase club_run row into the shape the founder run-card UI expects
+function normalizeClubRun(r) {
+  if(!r) return r;
+  // Already in old shape?
+  if(r.dist !== undefined && r.run_date === undefined) return r;
+  function fmtDate(d){
+    if(!d) return '';
+    try { var dt=new Date(d+'T12:00:00'); return dt.toLocaleDateString('en-IN',{month:'short',day:'numeric'}); } catch(e){ return d; }
+  }
+  function dayLabel(d){
+    if(!d) return '';
+    try { var dt=new Date(d+'T12:00:00'); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]; } catch(e){ return ''; }
+  }
+  return {
+    id: r.id,
+    name: r.name,
+    loc: r.location || '',
+    date: fmtDate(r.run_date),
+    rawDate: r.run_date,
+    day: dayLabel(r.run_date),
+    time: r.run_time || '',
+    dist: (r.distance_km != null ? r.distance_km + 'K' : ''),
+    fee: r.is_paid ? (r.fee||0) : 0,
+    isPaid: !!r.is_paid,
+    paces: r.pace_groups || [],
+    att: r._rsvpCount || 0,
+    lim: r.capacity || 30,
+    notes: r.notes || '',
+    photoCount: 0,
+    attendeeIds: []
+  };
+}
+
+// Get the founder's club (creates one on first use if none exists).
+async function loadFounderClub(userPrefs) {
+  var sb = getSupabase();
+  if(!sb) return null;
+  try {
+    var u = await sb.auth.getUser();
+    var uid = u && u.data && u.data.user && u.data.user.id;
+    if(!uid) return null;
+    // Look for a club this user founded
+    var res = await sb.from('clubs').select('*').eq('founder_id', uid).limit(1);
+    if(res.data && res.data.length) return res.data[0];
+    // None yet - create one from their prefs
+    var ins = await sb.from('clubs').insert({
+      name: (userPrefs && userPrefs.clubName) || ((userPrefs && userPrefs.name) || 'My') + "'s Run Club",
+      city: (userPrefs && userPrefs.city) || 'Bengaluru',
+      founder_id: uid,
+      vibe: 'social',
+      monthly_fee: 0
+    }).select();
+    if(ins.data && ins.data.length) return ins.data[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+// Update club details (name, area, fee, schedule, etc.)
+async function updateClub(clubId, fields) {
+  var sb = getSupabase();
+  if(!sb) return false;
+  try {
+    var res = await sb.from('clubs').update(fields).eq('id', clubId);
+    return !res.error;
+  } catch(e) { return false; }
+}
+
+// Load all runs for a club, soonest first.
+async function loadClubRuns(clubId) {
+  var sb = getSupabase();
+  if(!sb) return [];
+  try {
+    var res = await sb.from('club_runs').select('*').eq('club_id', clubId).order('run_date', {ascending:true});
+    return res.data || [];
+  } catch(e) { return []; }
+}
+
+// Create a run.
+async function createClubRun(clubId, run) {
+  var sb = getSupabase();
+  if(!sb) return null;
+  try {
+    var res = await sb.from('club_runs').insert({
+      club_id: clubId,
+      name: run.name,
+      run_date: run.run_date,
+      run_time: run.run_time,
+      location: run.location,
+      location_lat: run.location_lat || null,
+      location_lon: run.location_lon || null,
+      distance_km: run.distance_km || null,
+      pace_groups: run.pace_groups || [],
+      is_paid: !!run.is_paid,
+      fee: run.is_paid ? (run.fee || 0) : 0,
+      capacity: run.capacity || null,
+      notes: run.notes || ''
+    }).select();
+    if(res.data && res.data.length) return res.data[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+// Delete a run.
+async function deleteClubRun(runId) {
+  var sb = getSupabase();
+  if(!sb) return false;
+  try {
+    var res = await sb.from('club_runs').delete().eq('id', runId);
+    return !res.error;
+  } catch(e) { return false; }
+}
+
+// Load RSVPs for a run (founder sees who's coming).
+async function loadRunRsvps(runId) {
+  var sb = getSupabase();
+  if(!sb) return [];
+  try {
+    var res = await sb.from('rsvps').select('*').eq('run_id', runId).order('rsvp_at',{ascending:true});
+    return res.data || [];
+  } catch(e) { return []; }
+}
+
+// Count RSVPs per run for a list of runs -> {runId: count}
+async function loadRsvpCounts(runIds) {
+  var sb = getSupabase();
+  if(!sb || !runIds || !runIds.length) return {};
+  try {
+    var res = await sb.from('rsvps').select('run_id').in('run_id', runIds);
+    var counts = {};
+    (res.data||[]).forEach(function(r){ counts[r.run_id] = (counts[r.run_id]||0)+1; });
+    return counts;
+  } catch(e) { return {}; }
+}
+
+// MEMBER: RSVP to a run. For free runs confirms instantly; paid runs return needsPayment.
+async function rsvpToRun(run, member) {
+  var sb = getSupabase();
+  if(!sb) return {ok:false, error:'not connected'};
+  try {
+    var u = await sb.auth.getUser();
+    var uid = u && u.data && u.data.user && u.data.user.id;
+    if(!uid) return {ok:false, error:'not signed in'};
+    var payStatus = run.is_paid ? 'pending' : 'none';
+    var res = await sb.from('rsvps').insert({
+      run_id: run.id,
+      member_id: member.id,
+      user_id: uid,
+      name: member.name,
+      pace_group: member.pace_group || null,
+      payment_status: payStatus
+    }).select();
+    if(res.error) return {ok:false, error:res.error.message};
+    return {ok:true, rsvp:(res.data&&res.data[0]), needsPayment: run.is_paid};
+  } catch(e) { return {ok:false, error:e.message}; }
+}
+
+// Mark an RSVP paid (after Razorpay success).
+async function markRsvpPaid(rsvpId, paymentId) {
+  var sb = getSupabase();
+  if(!sb) return false;
+  try {
+    var res = await sb.from('rsvps').update({payment_status:'paid', payment_id:paymentId}).eq('id', rsvpId);
+    return !res.error;
+  } catch(e) { return false; }
+}
+
+// -- MEMBER-SIDE CLUB HELPERS (Phase 2 minimal + RSVP) ----------------------
+
+// Find a club by its short join code (last 6 of the club id, uppercased).
+async function findClubByCode(code) {
+  var sb = getSupabase();
+  if(!sb || !code) return null;
+  try {
+    var clean = String(code).trim().toUpperCase();
+    // We store a short code on the club; match it
+    var res = await sb.from('clubs').select('*').eq('join_code', clean).limit(1);
+    if(res.data && res.data.length) return res.data[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+// The current user's membership row for a club (or null).
+async function myMembership(clubId) {
+  var sb = getSupabase();
+  if(!sb || !clubId) return null;
+  try {
+    var u = await sb.auth.getUser();
+    var uid = u && u.data && u.data.user && u.data.user.id;
+    if(!uid) return null;
+    var res = await sb.from('club_members').select('*').eq('club_id', clubId).eq('user_id', uid).limit(1);
+    if(res.data && res.data.length) return res.data[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+// Request to join a club (creates a pending membership).
+async function requestJoinClub(club, userPrefs) {
+  var sb = getSupabase();
+  if(!sb) return {ok:false, error:'not connected'};
+  try {
+    var u = await sb.auth.getUser();
+    var usr = u && u.data && u.data.user;
+    if(!usr) return {ok:false, error:'not signed in'};
+    // Already a member?
+    var existing = await myMembership(club.id);
+    if(existing) {
+      if(existing.status === 'blocked') return {ok:false, error:'blocked'};
+      return {ok:true, already:true, membership:existing};
+    }
+    var ins = await sb.from('club_members').insert({
+      club_id: club.id,
+      user_id: usr.id,
+      name: (userPrefs && userPrefs.name) || 'Runner',
+      email: usr.email || null,
+      phone: (userPrefs && userPrefs.phone) || null,
+      birthday: (userPrefs && userPrefs.birthday) || null,
+      instagram: (userPrefs && userPrefs.instagram) || null,
+      pace: (userPrefs && userPrefs.pace) || null,
+      status: 'pending'
+    }).select();
+    if(ins.error) return {ok:false, error:ins.error.message};
+    return {ok:true, membership:(ins.data && ins.data[0])};
+  } catch(e) { return {ok:false, error:e.message}; }
+}
+
+// Load all members of a club (founder view), real data.
+async function loadClubMembers(clubId) {
+  var sb = getSupabase();
+  if(!sb || !clubId) return [];
+  try {
+    var res = await sb.from('club_members').select('*').eq('club_id', clubId).order('requested_at',{ascending:false});
+    return res.data || [];
+  } catch(e) { return []; }
+}
+
+// Founder: approve a pending member.
+async function approveMember(memberId) {
+  var sb = getSupabase();
+  if(!sb) return false;
+  try {
+    var res = await sb.from('club_members').update({
+      status:'active',
+      joined_at: new Date().toISOString()
+    }).eq('id', memberId);
+    return !res.error;
+  } catch(e) { return false; }
+}
+
+// Founder: remove (and block) a member - kills their access to all runs.
+async function removeMember(memberId, block) {
+  var sb = getSupabase();
+  if(!sb) return false;
+  try {
+    var res = await sb.from('club_members').update({
+      status: block ? 'blocked' : 'removed'
+    }).eq('id', memberId);
+    return !res.error;
+  } catch(e) { return false; }
+}
+
+// Has this member already RSVP'd to this run?
+async function myRsvp(runId, memberId) {
+  var sb = getSupabase();
+  if(!sb) return null;
+  try {
+    var res = await sb.from('rsvps').select('*').eq('run_id', runId).eq('member_id', memberId).limit(1);
+    if(res.data && res.data.length) return res.data[0];
+    return null;
+  } catch(e) { return null; }
+}
+
+// Cancel an RSVP.
+async function cancelRsvp(rsvpId) {
+  var sb = getSupabase();
+  if(!sb) return false;
+  try {
+    var res = await sb.from('rsvps').delete().eq('id', rsvpId);
+    return !res.error;
+  } catch(e) { return false; }
+}
+
+
 
 async function logInteractionSupa(data) {
   try {
@@ -6533,6 +6813,159 @@ function RunDetailView(props) {
     }
   }, "Upload first photo"))));
 }
+
+// -- MEMBER CLUB VIEW (real Supabase) - join code + runs + RSVP -------------
+function MemberClubView(props) {
+  var userPrefs = props.userPrefs, onBack = props.onBack, toast = props.toast;
+  var [code, setCode] = useState('');
+  var [club, setClub] = useState(null);
+  var [membership, setMembership] = useState(null);
+  var [runs, setRuns] = useState([]);
+  var [myRsvps, setMyRsvps] = useState({});      // runId -> rsvp row
+  var [loading, setLoading] = useState(true);
+  var [joining, setJoining] = useState(false);
+  var [busyRun, setBusyRun] = useState(null);
+
+  // On mount: find the club this user already belongs to (if any)
+  useEffect(function () {
+    var alive = true;
+    (async function () {
+      var sb = getSupabase();
+      if (!sb) { if (alive) setLoading(false); return; }
+      try {
+        var u = await sb.auth.getUser();
+        var uid = u && u.data && u.data.user && u.data.user.id;
+        if (!uid) { if (alive) setLoading(false); return; }
+        // Find any membership for this user
+        var mres = await sb.from('club_members').select('*').eq('user_id', uid).neq('status','removed').neq('status','blocked').limit(1);
+        if (mres.data && mres.data.length) {
+          var mem = mres.data[0];
+          var cres = await sb.from('clubs').select('*').eq('id', mem.club_id).limit(1);
+          var c = cres.data && cres.data[0];
+          if (alive) { setMembership(mem); setClub(c); }
+          if (c && mem.status === 'active') await loadRunsFor(c.id, uid, alive);
+        }
+      } catch (e) {}
+      if (alive) setLoading(false);
+    })();
+    return function () { alive = false; };
+  }, []);
+
+  async function loadRunsFor(clubId, uid, alive) {
+    var sb = getSupabase();
+    var rs = await loadClubRuns(clubId);
+    var today = new Date().toISOString().split('T')[0];
+    rs = rs.filter(function (r) { return (r.run_date || '') >= today; });
+    var ids = rs.map(function (r) { return r.id; });
+    var counts = await loadRsvpCounts(ids);
+    // my rsvps
+    var mine = {};
+    try {
+      var mr = await sb.from('rsvps').select('*').eq('user_id', uid).in('run_id', ids.length?ids:['none']);
+      (mr.data || []).forEach(function (x) { mine[x.run_id] = x; });
+    } catch (e) {}
+    rs = rs.map(function (r) { r._rsvpCount = counts[r.id] || 0; return normalizeClubRun(r); });
+    if (alive !== false) { setRuns(rs); setMyRsvps(mine); }
+  }
+
+  async function doJoin() {
+    if (!code.trim()) { toast && toast('Enter your club code'); return; }
+    setJoining(true);
+    var found = await findClubByCode(code);
+    if (!found) { toast && toast('No club found with that code'); setJoining(false); return; }
+    var res = await requestJoinClub(found, userPrefs);
+    if (res.ok) {
+      setClub(found);
+      setMembership(res.membership);
+      toast && toast(res.already ? 'You already requested to join' : 'Request sent to ' + found.name);
+    } else {
+      toast && toast(res.error === 'blocked' ? 'You cannot join this club' : 'Could not join - try again');
+    }
+    setJoining(false);
+  }
+
+  async function toggleRsvp(run) {
+    setBusyRun(run.id);
+    var existing = myRsvps[run.id];
+    if (existing) {
+      var ok = await cancelRsvp(existing.id);
+      if (ok) {
+        setMyRsvps(function (p) { var n = Object.assign({}, p); delete n[run.id]; return n; });
+        setRuns(function (p) { return p.map(function (r) { return r.id === run.id ? Object.assign({}, r, { att: Math.max(0, r.att - 1) }) : r; }); });
+        toast && toast('RSVP cancelled');
+      }
+    } else {
+      // capacity check
+      if (run.lim && run.att >= run.lim) { toast && toast('This run is full'); setBusyRun(null); return; }
+      var r = await rsvpToRun({ id: run.id, is_paid: run.isPaid, fee: run.fee }, membership);
+      if (r.ok) {
+        setMyRsvps(function (p) { var n = Object.assign({}, p); n[run.id] = r.rsvp; return n; });
+        setRuns(function (pr) { return pr.map(function (x) { return x.id === run.id ? Object.assign({}, x, { att: x.att + 1 }) : x; }); });
+        if (r.needsPayment) toast && toast('RSVP saved - payment coming soon');
+        else toast && toast("You're in! See you there");
+      } else { toast && toast('Could not RSVP - ' + (r.error||'try again')); }
+    }
+    setBusyRun(null);
+  }
+
+  var backBtn = React.createElement("button", {
+    onClick: function () { if (onBack) onBack(); },
+    style: { background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 14 }
+  }, React.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: C.t2, strokeWidth: "2", strokeLinecap: "round" }, React.createElement("polyline", { points: "15 18 9 12 15 6" })), React.createElement("span", { style: { fontSize: 13, color: C.t2, fontWeight: 500 } }, "Back"));
+
+  if (loading) {
+    return React.createElement("div", { style: { padding: '20px', minHeight: '60vh' } }, backBtn, React.createElement("p", { style: { color: C.t3, fontSize: 13 } }, "Loading your club..."));
+  }
+
+  // NOT in any club yet - join by code
+  if (!club || !membership) {
+    return React.createElement("div", { style: { padding: '20px', minHeight: '60vh' }, className: "fade" }, backBtn,
+      React.createElement("h1", { style: { fontFamily: C.F, fontSize: 24, fontWeight: 800, color: C.t1, letterSpacing: '-.6px', marginBottom: 6 } }, "Join your club"),
+      React.createElement("p", { style: { fontSize: 13, color: C.t3, marginBottom: 20, lineHeight: 1.6 } }, "Got a club code from your founder? Enter it below to request to join."),
+      React.createElement("input", {
+        value: code, onChange: function (e) { setCode(e.target.value.toUpperCase()); },
+        placeholder: "CLUB CODE", maxLength: 8,
+        style: { width: '100%', background: C.card2, border: '1px solid ' + C.b1, borderRadius: 12, padding: '14px', fontSize: 18, fontWeight: 700, letterSpacing: '2px', textAlign: 'center', color: C.t1, outline: 'none', fontFamily: C.F, marginBottom: 14, boxSizing: 'border-box', textTransform: 'uppercase' }
+      }),
+      React.createElement(Btn, { onClick: doJoin, disabled: joining }, joining ? "Joining..." : "Request to join"));
+  }
+
+  // Pending approval
+  if (membership.status === 'pending') {
+    return React.createElement("div", { style: { padding: '20px', minHeight: '60vh' }, className: "fade" }, backBtn,
+      React.createElement("div", { style: { textAlign: 'center', padding: '40px 20px' } },
+        React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: C.oFg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' } }, React.createElement("span", { style: { fontSize: 24 } }, "\u23f3")),
+        React.createElement("h2", { style: { fontFamily: C.F, fontSize: 20, fontWeight: 700, color: C.t1, marginBottom: 8 } }, club.name),
+        React.createElement("p", { style: { fontSize: 14, color: C.t2, lineHeight: 1.6 } }, "Your request is pending. The founder will approve you soon \u2014 then you can RSVP to runs.")));
+  }
+
+  // ACTIVE member - show club + runs with RSVP
+  return React.createElement("div", { style: { padding: '20px', paddingBottom: 32 }, className: "fade" }, backBtn,
+    React.createElement("h1", { style: { fontFamily: C.F, fontSize: 24, fontWeight: 800, color: C.t1, letterSpacing: '-.6px', marginBottom: 2 } }, club.name),
+    React.createElement("p", { style: { fontSize: 13, color: C.t3, marginBottom: 20 } }, (club.city || '') + (club.area ? ' \u00b7 ' + club.area : '')),
+    React.createElement(Lbl, { style: { marginBottom: 10 } }, "Upcoming runs"),
+    runs.length === 0
+      ? React.createElement("div", { style: { background: C.card, border: '1px solid ' + C.b1, borderRadius: 14, padding: '28px 20px', textAlign: 'center' } }, React.createElement("p", { style: { fontSize: 13, color: C.t3 } }, "No runs scheduled yet. Check back soon."))
+      : React.createElement("div", null, runs.map(function (run) {
+        var going = !!myRsvps[run.id];
+        var full = run.lim && run.att >= run.lim && !going;
+        return React.createElement("div", { key: run.id, style: { background: C.card, border: '1px solid ' + (going ? C.green : C.b1), borderRadius: 14, padding: '16px', marginBottom: 10 } },
+          React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 } },
+            React.createElement("div", null,
+              React.createElement("p", { style: { fontFamily: C.F, fontSize: 15, fontWeight: 700, color: C.t1, marginBottom: 4 } }, run.name),
+              React.createElement("p", { style: { fontSize: 12, color: C.t3 } }, run.day + ' ' + run.date + ' \u00b7 ' + run.time + ' \u00b7 ' + run.loc)),
+            React.createElement(Bdg, { color: run.fee === 0 ? C.green : C.orange, bg: run.fee === 0 ? C.gFg : C.oFg }, run.fee === 0 ? 'Free' : 'Rs.' + run.fee)),
+          run.paces && run.paces.length ? React.createElement("div", { style: { display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' } }, run.paces.map(function (p) { return React.createElement(Bdg, { key: p }, p, "/km"); })) : null,
+          React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid ' + C.b1, paddingTop: 12 } },
+            React.createElement("p", { style: { fontSize: 12, color: C.t3 } }, run.att + (run.lim ? ' / ' + run.lim : '') + (run.att === 1 ? ' going' : ' going')),
+            React.createElement("button", {
+              onClick: function () { toggleRsvp(run); }, disabled: busyRun === run.id || full,
+              style: { background: going ? C.gFg : (full ? C.card2 : C.navy), color: going ? C.green : (full ? C.t3 : '#fff'), border: going ? '1px solid ' + C.green : 'none', borderRadius: 9, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: full ? 'default' : 'pointer', fontFamily: C.F } },
+              busyRun === run.id ? '...' : (going ? "Going \u2713" : (full ? "Full" : "RSVP")))));
+      })));
+}
+
+
 function MyClubsScreen(props) {
   var userPrefs = props.userPrefs,
     onBack = props.onBack;
@@ -7954,8 +8387,9 @@ function ProfileScreen(props) {
     });
     setUserPrefs(np);
   }
-  if (showClubs) return /*#__PURE__*/React.createElement(MyClubsScreen, {
+  if (showClubs) return /*#__PURE__*/React.createElement(MemberClubView, {
     userPrefs: userPrefs,
+    toast: toast,
     onBack: function () {
       setShowClubs(false);
     }
@@ -8695,40 +9129,53 @@ function FounderHomeScreen(props) {
     setNav = props.setNav;
   var name = (userPrefs.name || 'Founder').split(' ')[0];
   var [showCreate, setShowCreate] = useState(false);
-  var [members, setMembers] = useState(function () {
-    return load('p_members', null) || SAMPLE_MEMBERS;
-  });
-  var pending = members.filter(function (m) {
-    return m.status === 'pending';
-  });
-  var unpaid = members.filter(function (m) {
-    return m.status === 'active' && !m.paid;
-  });
-  var active = members.filter(function (m) {
-    return m.status === 'active';
-  });
-  var nextRun = CLUB_RUNS[0];
-  function approve(id) {
-    var updated = members.map(function (m) {
-      return m.id === id ? Object.assign({}, m, {
-        status: 'active',
-        joined: new Date().toLocaleDateString('en-IN', {
-          month: 'short',
-          year: 'numeric'
-        })
-      }) : m;
-    });
-    setMembers(updated);
-    store('p_members', updated);
-    toast && toast('Member approved');
+  var [club, setClub] = useState(null);
+  var [members, setMembers] = useState([]);
+  var [clubRuns, setClubRuns] = useState([]);
+  var [loadingClub, setLoadingClub] = useState(true);
+  // Load real club, members, runs from Supabase
+  useEffect(function () {
+    var alive = true;
+    (async function () {
+      var c = await loadFounderClub(userPrefs);
+      if (!alive) return;
+      setClub(c);
+      if (c && c.id) {
+        var mem = await loadClubMembers(c.id);
+        var runs = await loadClubRuns(c.id);
+        var ids = runs.map(function (r) { return r.id; });
+        var counts = await loadRsvpCounts(ids);
+        runs = runs.map(function (r) { r._rsvpCount = counts[r.id] || 0; return normalizeClubRun(r); });
+        if (alive) { setMembers(mem); setClubRuns(runs); }
+      }
+      if (alive) setLoadingClub(false);
+    })();
+    return function () { alive = false; };
+  }, []);
+  var pending = members.filter(function (m) { return m.status === 'pending'; });
+  var active = members.filter(function (m) { return m.status === 'active'; });
+  var unpaid = active.filter(function (m) { return !m.paid; });
+  // Soonest upcoming run
+  var todayISO = new Date().toISOString().split('T')[0];
+  var upcoming = clubRuns.filter(function (r) { return (r.rawDate || '') >= todayISO; });
+  var nextRun = upcoming.length ? upcoming[0] : null;
+  async function approve(id) {
+    var ok = await approveMember(id);
+    if (ok) {
+      setMembers(function (prev) {
+        return prev.map(function (m) {
+          return m.id === id ? Object.assign({}, m, { status: 'active', joined_at: new Date().toISOString() }) : m;
+        });
+      });
+      toast && toast('Member approved');
+    } else { toast && toast('Could not approve - check connection'); }
   }
-  function decline(id) {
-    var updated = members.filter(function (m) {
-      return m.id !== id;
-    });
-    setMembers(updated);
-    store('p_members', updated);
-    toast && toast('Declined');
+  async function decline(id) {
+    var ok = await removeMember(id, false);
+    if (ok) {
+      setMembers(function (prev) { return prev.filter(function (m) { return m.id !== id; }); });
+      toast && toast('Declined');
+    }
   }
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8859,138 +9306,60 @@ function FounderHomeScreen(props) {
     style: {
       color: C.navy
     }
-  }, /*#__PURE__*/React.createElement(IcoArrow, null))))), /*#__PURE__*/React.createElement(Lbl, {
+  }, /*#__PURE__*/React.createElement(IcoArrow, null))))), /*#__PURE__*/React.createElement("div", {style:{background:C.card,border:'1px solid '+C.b1,borderRadius:14,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',justifyContent:'space-between'}},
+    /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("p", {style:{fontSize:11,color:C.t3,fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',marginBottom:3}}, "Club code"),
+      /*#__PURE__*/React.createElement("p", {style:{fontSize:20,fontWeight:800,color:C.t1,letterSpacing:'2px',fontFamily:C.F}}, (club && club.join_code) || '\u2014')),
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function(){
+        var cc = (club && club.join_code) || '';
+        var msg = 'Join ' + ((club&&club.name)||'our run club') + ' on PACER! Use code ' + cc;
+        if(navigator.share){ navigator.share({title:'Join my run club', text:msg}).catch(function(){}); }
+        else if(navigator.clipboard){ navigator.clipboard.writeText(msg); toast && toast('Invite copied'); }
+        else { toast && toast('Code: ' + cc); }
+      },
+      style:{background:C.navy,color:'#fff',border:'none',borderRadius:9,padding:'9px 16px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:C.F}
+    }, "Share invite")),
+  /*#__PURE__*//*#__PURE__*/React.createElement(Lbl, {
     style: {
       marginBottom: 10
     }
-  }, "Next club run"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.navy,
-      borderRadius: 16,
-      overflow: 'hidden',
-      marginBottom: 16,
-      boxShadow: '0 4px 24px rgba(15,23,42,.18)'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: 3,
-      background: 'linear-gradient(90deg,#1D4ED8,#7C3AED)'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '20px 20px 22px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontFamily: C.F,
-      fontSize: 20,
-      fontWeight: 700,
-      color: '#fff',
-      letterSpacing: '-.4px',
-      marginBottom: 4
-    }
-  }, nextRun.name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 12
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,.45)'
-    }
-  }, nextRun.date), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,.45)'
-    }
-  }, nextRun.time), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,.45)'
-    }
-  }, nextRun.loc))), /*#__PURE__*/React.createElement(Bdg, {
-    color: "rgba(255,255,255,.5)",
-    bg: "rgba(255,255,255,.08)"
-  }, nextRun.dist)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      marginBottom: 16,
-      borderTop: '1px solid rgba(255,255,255,.07)',
-      borderBottom: '1px solid rgba(255,255,255,.07)',
-      padding: '13px 0'
-    }
-  }, [['Rs.' + active.length * 150, 'Potential', C.green], [String(unpaid.length), 'Unpaid', C.orange], [String(nextRun.att), 'Going', 'rgba(255,255,255,.55)']].map(function (item, i) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        flex: 1,
-        textAlign: 'center',
-        borderRight: i < 2 ? '1px solid rgba(255,255,255,.07)' : 'none'
-      }
-    }, /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontFamily: C.F,
-        fontSize: 20,
-        fontWeight: 700,
-        color: item[2],
-        letterSpacing: '-.5px',
-        lineHeight: 1,
-        marginBottom: 3
-      }
-    }, item[0]), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 10,
-        color: 'rgba(255,255,255,.22)',
-        textTransform: 'uppercase',
-        letterSpacing: '1px'
-      }
-    }, item[1]));
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setNav && setNav('manage');
-    },
-    style: {
-      flex: 2,
-      background: 'rgba(255,255,255,.92)',
-      color: C.navy,
-      border: 'none',
-      borderRadius: 10,
-      padding: '13px',
-      fontFamily: C.F,
-      fontWeight: 700,
-      fontSize: 14,
-      cursor: 'pointer'
-    }
-  }, "Manage run"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowCreate(true);
-    },
-    style: {
-      flex: 1,
-      background: 'rgba(255,255,255,.08)',
-      color: 'rgba(255,255,255,.6)',
-      border: 'none',
-      borderRadius: 10,
-      padding: '13px',
-      fontFamily: C.F,
-      fontWeight: 700,
-      fontSize: 13,
-      cursor: 'pointer'
-    }
-  }, "+ New run")))), pending.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "Next club run"), /*#__PURE__*/nextRun ? React.createElement("div", {
+    style: { background: C.navy, borderRadius: 16, overflow: 'hidden', marginBottom: 20, boxShadow: '0 8px 24px rgba(15,23,42,.18)' }
+  },
+    React.createElement("div", { style: { height: 3, background: 'linear-gradient(90deg,#1D4ED8,#7C3AED)' } }),
+    React.createElement("div", { style: { padding: '20px 20px 22px' } },
+      React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 } },
+        React.createElement("div", null,
+          React.createElement("h2", { style: { fontFamily: C.F, fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: '-.4px', marginBottom: 4 } }, nextRun.name),
+          React.createElement("div", { style: { display: 'flex', gap: 12, flexWrap: 'wrap' } },
+            React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,.55)' } }, nextRun.day + ' ' + nextRun.date),
+            React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,.55)' } }, nextRun.time),
+            React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,.55)' } }, nextRun.loc))),
+        React.createElement(Bdg, { color: nextRun.fee === 0 ? '#4ade80' : '#FF9500', bg: 'rgba(255,255,255,.08)' }, nextRun.fee === 0 ? 'Free' : 'Rs.' + nextRun.fee)),
+      React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 14 } },
+        React.createElement("div", null,
+          React.createElement("p", { style: { fontSize: 22, fontWeight: 800, color: '#fff', lineHeight: 1 } }, nextRun.att, nextRun.lim ? React.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.4)' } }, ' / ' + nextRun.lim) : null),
+          React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 2 } }, nextRun.att === 1 ? 'runner going' : 'runners going')),
+        React.createElement("button", {
+          onClick: function () { if (setNav) setNav('manage'); },
+          style: { background: 'rgba(255,255,255,.12)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: C.F }
+        }, "View run")),
+      React.createElement("button", {
+        onClick: function () { setShowCreate(true); },
+        style: { width: '100%', marginTop: 12, background: 'transparent', color: 'rgba(255,255,255,.6)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 9, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: C.F }
+      }, "+ Post another run")))
+  : React.createElement("div", {
+    style: { background: C.navy, borderRadius: 16, overflow: 'hidden', marginBottom: 20, boxShadow: '0 8px 24px rgba(15,23,42,.18)' }
+  },
+    React.createElement("div", { style: { height: 3, background: 'linear-gradient(90deg,#1D4ED8,#7C3AED)' } }),
+    React.createElement("div", { style: { padding: '28px 20px', textAlign: 'center' } },
+      React.createElement("p", { style: { fontFamily: C.F, fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 6 } }, "No run scheduled"),
+      React.createElement("p", { style: { fontSize: 13, color: 'rgba(255,255,255,.5)', marginBottom: 18, lineHeight: 1.5 } }, "Post your next run so members can RSVP."),
+      React.createElement("button", {
+        onClick: function () { setShowCreate(true); },
+        style: { background: '#fff', color: C.navy, border: 'none', borderRadius: 10, padding: '12px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: C.F }
+      }, "+ Post a run"))), pending.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16
     }
@@ -9099,7 +9468,36 @@ function FounderHomeScreen(props) {
         marginBottom: 3
       }
     }, item[0]), /*#__PURE__*/React.createElement(Lbl, null, item[1]));
-  }))), showCreate && /*#__PURE__*/React.createElement(CreateRunSheet, {open:showCreate, onClose:function(){setShowCreate(false);}, onSave:function(runData){var fr=load('p_founder_runs',[])||[];fr.unshift(Object.assign({},runData,{id:Date.now(),createdAt:new Date().toISOString()}));store('p_founder_runs',fr);setShowCreate(false);}}));
+  }))), showCreate && /*#__PURE__*/React.createElement(CreateRunSheet, {open:showCreate, onClose:function(){setShowCreate(false);}, onSave:async function(runData){
+    // Save run to Supabase if club is loaded; fall back to local cache otherwise
+    if(club && club.id){
+      var created = await createClubRun(club.id, {
+        name: runData.name,
+        run_date: runData.date,
+        run_time: runData.time,
+        location: runData.loc,
+        distance_km: parseFloat(runData.dist) || null,
+        pace_groups: runData.paces || [],
+        is_paid: !!runData.paidRun,
+        fee: runData.paidRun ? (parseInt(runData.fee)||0) : 0,
+        capacity: runData.unlimited ? null : (parseInt(runData.lim) || null),
+        notes: runData.notes || ''
+      });
+      if(created){
+        setClubRuns(function(prev){ created._rsvpCount=0; return [normalizeClubRun(created)].concat(prev||[]); });
+        toast && toast('Run posted to your club');
+      } else {
+        toast && toast('Could not save run -- check connection');
+      }
+    } else {
+      // Local fallback (offline / club not yet created)
+      var fr=load('p_founder_runs',[])||[];
+      fr.unshift(Object.assign({},runData,{id:Date.now(),createdAt:new Date().toISOString()}));
+      store('p_founder_runs',fr);
+      toast && toast('Run saved locally');
+    }
+    setShowCreate(false);
+  }}));
 }
 
 // --- CREATE RUN SHEET ---
@@ -9148,6 +9546,7 @@ function CreateRunSheet(props) {
   var [notes, setNotes] = useState('');
   var [paces, setPaces] = useState(['5:30', '6:30']);
   var [lim, setLim] = useState('30');
+  var [unlimited, setUnlimited] = useState(false);
   var [showTemplates, setShowTemplates] = useState(false);
   var TODAY = new Date().toISOString().split('T')[0];
   function applyTemplate(t) {
@@ -9184,11 +9583,13 @@ function CreateRunSheet(props) {
       date: date,
       day: getDayLabel(date),
       time: fmt12(time),
-      dist: dist + 'K',
+      dist: dist,
+      paidRun: paidRun,
       fee: paidRun ? parseInt(fee) || 0 : 0,
       paces: paces,
       att: 0,
-      lim: parseInt(lim) || 30,
+      lim: unlimited ? null : (parseInt(lim) || 30),
+      unlimited: unlimited,
       notes: notes.trim(),
       photoCount: 0,
       attendeeIds: []
@@ -9205,6 +9606,7 @@ function CreateRunSheet(props) {
     setNotes('');
     setPaces(['5:30', '6:30']);
     setLim('30');
+    setUnlimited(false);
     onClose && onClose();
   }
   var inputStyle = {
@@ -9431,7 +9833,16 @@ function CreateRunSheet(props) {
         cursor: 'pointer'
       }
     }, d);
-  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lbl, {
+  }))), /*#__PURE__*/React.createElement("div", null,
+  /*#__PURE__*/React.createElement("div", {style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}},
+    /*#__PURE__*/React.createElement(Lbl, {style:{margin:0}}, "Limited spots"),
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function(){ setUnlimited(!unlimited); },
+      style:{position:'relative',width:44,height:26,borderRadius:13,border:'none',cursor:'pointer',background: !unlimited ? C.navy : C.b2, transition:'.2s'}
+    }, /*#__PURE__*/React.createElement("div", {style:{position:'absolute',top:3,left: !unlimited ? 21 : 3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'.2s'}}))),
+  unlimited
+  ? /*#__PURE__*/React.createElement("p", {style:{fontSize:12,color:C.t3,marginBottom:4,lineHeight:1.5}}, "Unlimited - anyone in the club can join this run.")
+  : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lbl, {
     style: {
       marginBottom: 6
     }
@@ -9458,7 +9869,7 @@ function CreateRunSheet(props) {
         cursor: 'pointer'
       }
     }, n);
-  })))), /*#__PURE__*/React.createElement(Lbl, {
+  }))))), /*#__PURE__*/React.createElement(Lbl, {
     style: {
       marginBottom: 6
     }
@@ -9625,10 +10036,34 @@ function ManageScreen(props) {
     toast = props.toast;
   var [tab, setTab] = useState('members');
   var [showCreate, setShowCreate] = useState(false);
-  var [clubRuns, setClubRuns] = useState(CLUB_RUNS);
+  var [founderClub, setFounderClub] = useState(null);
+  var [clubLoading, setClubLoading] = useState(true);
+  var [clubRuns, setClubRuns] = useState([]);
   var [members, setMembers] = useState(function () {
     return load('p_members', null) || SAMPLE_MEMBERS;
   });
+  // Load the founder's real club + runs from Supabase on mount
+  useEffect(function(){
+    var alive = true;
+    (async function(){
+      var club = await loadFounderClub(userPrefs);
+      if(!alive) return;
+      setFounderClub(club);
+      if(club && club.id){
+        var runs = await loadClubRuns(club.id);
+        // Fetch RSVP counts and normalize to the card shape
+        var ids = runs.map(function(r){ return r.id; });
+        var counts = await loadRsvpCounts(ids);
+        var normalized = runs.map(function(r){
+          r._rsvpCount = counts[r.id] || 0;
+          return normalizeClubRun(r);
+        });
+        if(alive) setClubRuns(normalized);
+      }
+      if(alive) setClubLoading(false);
+    })();
+    return function(){ alive = false; };
+  }, []);
   var pending = members.filter(function (m) {
     return m.status === 'pending';
   });
